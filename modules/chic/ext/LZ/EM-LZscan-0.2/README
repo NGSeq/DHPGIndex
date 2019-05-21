@@ -1,0 +1,33 @@
+Description
+-----------
+
+This package contains implementation of external memory algorithm
+computing the LZ77 factorization called EM-LZscan from the paper
+
+  Juha Karkkainen, Dominik Kempa and Simon J. Puglisi,
+  Lempel-Ziv Parsing in External Memory.
+  In Proc. DCC 2014.
+
+
+Compilation and usage
+---------------------
+
+Compilation is done with the Makefile provided in the src/ directory.
+
+$ cd src
+$ make
+
+The encode_lz77 program encodes the given file using LZ77 method,
+decode_lz77 decodes the file back to original. Run program without
+parameter for exact syntax.
+
+
+Terms of use
+------------
+
+If you use this code, please cite the paper mentioned above and publish
+the URL from which you downloaded the code.
+
+
+
+Helsinki, Feb 2016.

@@ -1,0 +1,43 @@
+-- Description
+
+This package contains implementation of lightweight Lempel-Ziv (LZ77) parsing
+algorithm called LZscan described in the paper
+
+  Juha Karkkainen, Dominik Kempa, Simon J. Puglisi,
+  Lightweight Lempel-Ziv Parsing.
+  In Proc. SEA 2013, LNCS 7933:139-150, 2013.
+
+The algorithm factorizes a string of length n over byte alphabet in time
+O(nd log (n/d)) and requires roughly n + 27n/d bytes of space (including the
+input string of n bytes), where d is a parameter controlling the time/space
+trade-off.
+
+
+-- Terms of use
+
+If you use this code for experiments in a research paper, please cite the paper
+mentioned above and publish the URL from which you downloaded the code.
+
+
+-- Content
+
+The implementation of the algorithm is contained in the algorithm/
+directory. It consists of the following files:
+
+  bitmap.h      -- simple bitset implementation,
+  common.*      -- misc routines,
+  divsufsort.*  -- fast suffix array construction by Yuta Mori
+                   (http://code.google.com/p/libdivsufsort/)
+  lcp.*         -- construction of LCP array,
+  lzscan.h      -- main header file, only this file needs to be included
+                   to use the factorization algorithm,
+  match.h       -- pattern matching routines,
+  ms_support.h  -- support for matching statistics,
+  parse.cpp     -- the main parsing function,
+  rmq_tree.h    -- space efficient data structure answering NSV/PSV queries.
+
+See individual files for more details. An example usage of LZscan is
+demonstrated in the examples/ directory.
+
+
+Helsinki, June 2013.

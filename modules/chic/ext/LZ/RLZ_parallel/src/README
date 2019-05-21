@@ -1,0 +1,8 @@
+Parallel version of RLZ, where the reference is a prefix of the input text.
+Therefore the parsing is a LZ77 valid parsing that can be used by CHICO.
+
+
+Ussage:
+
+./rlz_parser.sh INPUT_FILE OUTPUT_FILE REF_SIZE_MB N_CHUNKS N_THREADS MAX_MEM_MB
+

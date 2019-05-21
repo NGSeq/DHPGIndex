@@ -1,0 +1,14 @@
+This directory contains an example tool demonstrating the use of LZscan
+algorithm.
+
+Below is an example session assuming there is a file named 'data' in the
+examples/ directory.
+
+
+# Compilation
+> make clean
+> make
+
+# Compute the size of LZ77 parsing with a block length equal to
+# 1MiB, i.e. using roughly n + 27 * 2^20 bytes of main memory.
+> ./count data 1

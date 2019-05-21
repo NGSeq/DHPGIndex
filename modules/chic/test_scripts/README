@@ -1,0 +1,5 @@
+Hand made scripts to validate important features.
+
+You shoukd be able to run any of the validate_SOMETHING commands directly (other scripts are auxiliary tools).
+
+This is actually what the .gitlab-ci.yml script in the root folder does to validate new commits.
