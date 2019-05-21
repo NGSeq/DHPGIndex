@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+#./index.sh 2122 out FMI
+
 set -e 
 set -o pipefail
 
@@ -19,7 +22,7 @@ start=`date +%s`
 #--conf spark.executor.memoryOverhead=2000 --class org.ngseq.panquery.DistributedRLZ \
 #${JAR_PATH} ${HDFS_PATH} ${REF_SIZE} ${RLZ_SPLITS}
 
-#spark-submit --master yarn --deploy-mode client --num-executors 10 --executor-memory 10g --conf spark.driver.memory=20g --conf spark.executor.memoryOverhead=2000 --class org.ngseq.panquery.DistributedRLZ ${JAR_PATH} ${HDFS_PATH} ${REF_SIZE} ${RLZ_SPLITS}
+spark-submit --master yarn --deploy-mode client --num-executors 10 --executor-memory 10g --conf spark.driver.memory=20g --conf spark.executor.memoryOverhead=2000 --class org.ngseq.panquery.DistributedRLZ ${JAR_PATH} ${HDFS_PATH} ${REF_SIZE} ${RLZ_SPLITS}
 
 end=`date +%s`
 runtime=$((end-start))
