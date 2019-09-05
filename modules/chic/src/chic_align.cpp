@@ -1,22 +1,4 @@
-/*
-	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
-
-	 This file is part of CHIC aligner.
-
-	 CHIC aligner is free software: you can redistribute it and/or modify
-	 it under the terms of the GNU General Public License as published by
-	 the Free Software Foundation, either version 3 of the License, or
-	 (at your option) any later version.
-
-	 CHIC aligner is distributed in the hope that it will be useful,
-	 but WITHOUT ANY WARRANTY; without even the implied warranty of
-	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	 GNU General Public License for more details.
-
-	 You should have received a copy of the GNU General Public License
-	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
+// Copyright Daniel Valenzuela
 #include <getopt.h>
 #include <sdsl/util.hpp>
 #include <sdsl/vectors.hpp>
@@ -38,24 +20,24 @@ using std::ifstream;
 
 void suggest_help();
 void suggest_help(char ** argv) {
-  cerr << "For help, type " << argv[0] << " --help" << endl;
+  cout << "For help, type " << argv[0] << " --help" << endl;
 }
 
 void print_help();
 void print_help() {
-  cerr << "Compressed Hybrid Index v0.1 beta" << endl;
-  cerr << "chic_align aligns reads in fq format" << endl;
-  cerr << endl;
-  cerr << "Ussage: chic_align [OPTIONS] <index_basename> <reads1.fq> (reads2.fq)" << endl;
-  cerr << endl;
-  cerr << "Options:" << endl;
-  cerr << "-o --output=OUTPUT_FILENAME Default: Standard output" << endl;
-  cerr << "-s --secondary_report=[ALL|LZ|NONE] Default=NONE" << endl;
-  cerr << "-t --threads=(number of threads)" << endl;
-  cerr << "-p --interleaved-reads " << endl;
-  cerr << "-K --kernel-options " << endl;
-  cerr << "-v --verbose=LEVEL " << endl;
-  cerr << "--help " << endl;
+  cout << "Compressed Hybrid Index v0.1 beta" << endl;
+  cout << "chic_align aligns reads in fq format" << endl;
+  cout << endl;
+  cout << "Ussage: chic_align [OPTIONS] <index_basename> <reads1.fq> (reads2.fq)" << endl;
+  cout << endl;
+  cout << "Options:" << endl;
+  cout << "-o --output=OUTPUT_FILENAME Default: Standard output" << endl;
+  cout << "-s --secondary_report=[ALL|LZ|NONE] Default=NONE" << endl;
+  cout << "-t --threads=(number of threads)" << endl;
+  cout << "-p --interleaved-reads " << endl;
+  cout << "-K --kernel-options " << endl;
+  cout << "-v --verbose=LEVEL " << endl;
+  cout << "--help " << endl;
 }
 
 typedef struct {
@@ -160,7 +142,7 @@ int main(int argc, char *argv[]) {
           exit(-1);
         }
         break;
-
+      
       case 'K':
         parameters->kernel_options.push_back(std::string(optarg));
         break;
@@ -187,7 +169,7 @@ int main(int argc, char *argv[]) {
 
   int rest = argc - optind;
   if (rest != 2 && rest != 3) {
-    cerr << "Incorrect number of arguments." << endl;
+    cout << "Incorrect number of arguments." << endl;
     suggest_help(argv);
     exit(-1);
   }
@@ -210,7 +192,7 @@ int main(int argc, char *argv[]) {
                  parameters->n_threads,
                  parameters->verbose);
 
-  cerr << "LZ Index succesfully load" << endl;
+  cout << "LZ Index succesfully load" << endl;
   ///////////////////////////////////////////////////
   // FROM HERE ON START ACTING ACCORDING TO PARAMS:
   ///////////////////////////////////////////////////
@@ -235,17 +217,17 @@ int main(int argc, char *argv[]) {
                      my_out);
     my_out.close();
   }
-
+  
   t2 = Utils::wclock();
-  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cerr << "Reads aligned in: "<< (t2-t1) << " seconds. " << endl;
+  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cout << "Reads aligned in: "<< (t2-t1) << " seconds. " << endl;
   if (t2-t1 > 60) {
-    cerr << "Reads aligned in: "<< (t2-t1)/60 << " minutes. " << endl;
+    cout << "Reads aligned in: "<< (t2-t1)/60 << " minutes. " << endl;
   }
   if (t2-t1 > 3600) {
-    cerr << "Reads aligned in: "<< (t2-t1)/3600 << " hours. " << endl;
+    cout << "Reads aligned in: "<< (t2-t1)/3600 << " hours. " << endl;
   }
-  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
 
   delete(my_index);
   delete(parameters);
@@ -278,6 +260,6 @@ vector<string> LoadPatterns(char * filename, uint max_query_len) {
     data.push_back(line);
   }
   ValidatePatterns(data, max_query_len);
-  cerr << data.size() << " patterns succesfully loaded from "<< filename << endl;
+  cout << data.size() << " patterns succesfully loaded from "<< filename << endl;
   return data;
 }

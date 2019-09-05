@@ -2,19 +2,19 @@
 #CXX_FLAGS=$(MY_CXX_FLAGS) $(MY_CXX_OPT_FLAGS)
 #CXX_FLAGS=$(MY_CXX_FLAGS)
 PROJECT_ROOT:= $(dir $(abspath $(lastword $(MAKEFILE_LIST))/..))
-include ../ext/sdsl-lite-2.1.1/Make.helper
+include ../ext/sdsl-lite-2.0.3/Make.helper
 
-PARANOID=-pedantic -Wall -Wextra -Wcast-align -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wlogical-op -Wmissing-declarations -Wmissing-include-dirs -Wnoexcept -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-null-sentinel  -Wswitch-default -Wundef -Werror -Winline -Wno-error=unused-parameter -Wno-error=unused-variable -Wno-error=unknown-pragmas
+PARANOID=-pedantic -Wall -Wextra -Wcast-align -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wlogical-op -Wmissing-declarations -Wmissing-include-dirs -Wnoexcept -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-null-sentinel  -Wswitch-default -Wundef -Werror -Winline -Wno-error=unused-parameter -Wno-error=unused-variable
 
-#CXX_FLAGS= -std=c++11 -Wall -Wextra  -O0 -ggdb -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
-CXX_FLAGS= -std=c++11 -Wall -Wextra -fopenmp -O9 -DNDEBUG -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
+#CXX_FLAGS= -std=c++11 -Wall -Wextra -O0 -ggdb -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
+CXX_FLAGS= -std=c++11 -Wall -Wextra  -O9 -DNDEBUG -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
 
 INCLUDES=-isystem$(INC_DIR)
 LIB=$(LIB_DIR)/libsdsl.a $(LIB_DIR)/libdivsufsort.a $(LIB_DIR)/libdivsufsort64.a -lz
 LZ_FILES=../ext/LZ/LZscan/algorithm/lcp.cpp ../ext/LZ/LZscan/algorithm/parse.cpp ../ext/LZ/LZscan/algorithm/divsufsort.c ../ext/LZ/LZscan/algorithm/common.cpp
 
-OBJECTS=utils.o RangeReporting.o BookKeeper.o fasta.o KernelManagerFMI.o KernelManagerBWA.o KernelManagerBowTie2.o HybridLZIndex.o LempelZivParser.o SamReader.o
-CHICA_BINS=chic_index chic_align
+OBJECTS=utils.o RangeReporting.o BookKeeper.o fasta.o KernelManagerFMI.o KernelManagerBWA.o KernelManagerBowTie2.o HybridLZIndex.o LempelZivParser.o
+CHICA_BINS=chic_index chic_align chic_map
 CHICO_BINS=build_index load_index
 
 %.o: %.cpp
@@ -27,11 +27,12 @@ all: stats $(OBJECTS) $(CHICA_BINS) $(CHICO_BINS)
 
 stats:
 	@echo
+	@echo " COMPILING HybridLZIndex"
 	@echo " ###################"
 	@echo "  * Compiler flags: $(CXX_FLAGS)"
 	@echo "  * Include dirs: $(INCLUDES)"
 	@echo "  * Root Path: $(PROJECT_ROOT)"
-	@echo " ###################"
+	@echo
 	@echo
 
 clean:
@@ -46,13 +47,13 @@ chic_index: chic_index.cpp $(OBJECTS)
 	@echo " [BLD] Building chic_index"
 	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o chic_index chic_index.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
 
-load_index: load_index.cpp $(OBJECTS)
-	@echo " [BLD] Building load_index"
-	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o load_index load_index.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
-
 chic_map: chic_map.cpp $(OBJECTS)
 	@echo " [BLD] Building chic_map"
 	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o chic_map chic_map.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
+
+load_index: load_index.cpp $(OBJECTS)
+	@echo " [BLD] Building load_index"
+	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o load_index load_index.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
 
 chic_align: chic_align.cpp $(OBJECTS)
 	@echo " [BLD] Building chic_align"

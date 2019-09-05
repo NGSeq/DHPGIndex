@@ -1,22 +1,4 @@
-/*
-	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
-
-	 This file is part of CHIC aligner.
-
-	 CHIC aligner is free software: you can redistribute it and/or modify
-	 it under the terms of the GNU General Public License as published by
-	 the Free Software Foundation, either version 3 of the License, or
-	 (at your option) any later version.
-
-	 CHIC aligner is distributed in the hope that it will be useful,
-	 but WITHOUT ANY WARRANTY; without even the implied warranty of
-	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	 GNU General Public License for more details.
-
-	 You should have received a copy of the GNU General Public License
-	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
+// Copyright Daniel Valenzuela
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -26,26 +8,26 @@
 
 void suggest_help();
 void suggest_help(char ** argv) {
-  cerr << "For help, type " << argv[0] << " --help" << endl;
+  cout << "For help, type " << argv[0] << " --help" << endl;
 }
 
 void print_help();
 void print_help() {
-  cerr << "Ussage: build_index [OPTIONS] INPUT_FILE MAX_QUERY_LEN" << endl;
-  cerr << "Builds an index[1,2] for INPUT_FILE " << endl;
-  cerr << "It answers pattern matching queries of length up to MAX_QUERY_LEN" << endl;
-  cerr << endl;
-  cerr << "Options:" << endl;
-  cerr << "--kernel=[FMI,BWA,BOWTIE2] default is FMI" << endl;
-  cerr << "--lz-parsing-method=[IM,EM,RLZ] default is IM" << endl;
-  cerr << "--lz-input-file=PARSE.LZ In case you have the lz parsing of the input." << endl;
-  cerr << "--max-edit-distance (default = 0)" << endl;
-  cerr << "-o --output=INDEX_BASENAME Default: INPUT_FILE" << endl;
-  cerr << "-v --verbose=LEVEL " << endl;
-  cerr << "-m --mem=(MAX MEM IN MB)" << endl;
-  cerr << "-t --threads=(number of threads)" << endl;
-  cerr << "-r --rlz-ref-size=(Prefix size for RLZ method)" << endl;
-  cerr << "--help " << endl;
+  cout << "Ussage: build_index [OPTIONS] INPUT_FILE MAX_QUERY_LEN" << endl;
+  cout << "Builds an index[1,2] for INPUT_FILE " << endl;
+  cout << "It answers pattern matching queries of length up to MAX_QUERY_LEN" << endl;
+  cout << endl;
+  cout << "Options:" << endl;
+  cout << "--kernel=[FMI,BWA,BOWTIE2] default is FMI" << endl;
+  cout << "--lz-parsing-method=[IM,EM,RLZ] default is IM" << endl;
+  cout << "--lz-input-file=PARSE.LZ In case you have the lz parsing of the input." << endl;
+  cout << "--max-edit-distance (default = 0)" << endl;
+  cout << "-o --output=INDEX_BASENAME Default: INPUT_FILE" << endl;
+  cout << "-v --verbose=LEVEL " << endl;
+  cout << "-m --mem=(MAX MEM IN MB)" << endl;
+  cout << "-t --threads=(number of threads)" << endl;
+  cout << "-r --rlz-ref-size=(Prefix size for RLZ method)" << endl;
+  cout << "--help " << endl;
 }
 
 
@@ -127,10 +109,10 @@ int main(int argc, char **argv) {
           exit(0);
         }
         break;
-
+      
       case 'F':
         parameters->input_lz_filename = optarg;
-        parameters->lz_method = LZMethod::INPUT;
+        parameters->lz_method=LZMethod::INPUT;
         break;
 
 
@@ -177,7 +159,7 @@ int main(int argc, char **argv) {
   }
 
   if ((argc - optind) != 2) {
-    cerr << "Incorrect number of arguments." << endl;
+    cout << "Incorrect number of arguments." << endl;
     suggest_help(argv);
     exit(-1);
   }
@@ -190,8 +172,8 @@ int main(int argc, char **argv) {
 
   ///////////////////////////////////////////////////////////////
 
-  cerr << "Input filename: " << parameters->input_filename << endl;
-  cerr << "maximum pattern length: " << parameters->max_query_len << endl;
+  cout << "Input filename: " << parameters->input_filename << endl;
+  cout << "maximum pattern length: " << parameters->max_query_len << endl;
 
   ///////////////////////////////////////////////////////////////
   long double t1, t2;
@@ -201,9 +183,9 @@ int main(int argc, char **argv) {
   index->Save();
   t2 = Utils::wclock();
 
-  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cerr << "Index succesfully built in: "<< (t2-t1) << " seconds. " << endl;
-  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cout << "Index succesfully built in: "<< (t2-t1) << " seconds. " << endl;
+  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
   delete(index);
   delete(parameters);
   exit(0);

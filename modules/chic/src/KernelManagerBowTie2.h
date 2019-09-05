@@ -1,22 +1,3 @@
-/*
-	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
-
-	 This file is part of CHIC aligner.
-
-	 CHIC aligner is free software: you can redistribute it and/or modify
-	 it under the terms of the GNU General Public License as published by
-	 the Free Software Foundation, either version 3 of the License, or
-	 (at your option) any later version.
-
-	 CHIC aligner is distributed in the hope that it will be useful,
-	 but WITHOUT ANY WARRANTY; without even the implied warranty of
-	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	 GNU General Public License for more details.
-
-	 You should have received a copy of the GNU General Public License
-	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef KERNELMANAGERBOWTIE2_H_
 #define KERNELMANAGERBOWTIE2_H_
 
@@ -54,8 +35,6 @@ class KernelManagerBowTie2 : public KernelManager {
   KernelManagerBowTie2(uchar * text,
                    size_t text_len,
                    char * _kernel_text_filename,
-                   int _n_threads,
-                   int _max_memory_MB,
                    int _verbose);
   void CreateKernelTextFile(uchar * kernel_text, size_t kernel_text_len);
   void DeleteKernelTextFile();
@@ -68,12 +47,15 @@ class KernelManagerBowTie2 : public KernelManager {
 
 
   // Queries and accessors:
-  string  LocateOccsFQ(char * query_filename,
-                       char * mates_filename,
-                       bool retrieve_all,
-                       bool single_file_paired,
-                       vector<string> kernel_options) const;
+  vector<Occurrence> LocateOccsFQ(char * query_filename,
+                                  char * mates_filename,
+                                  bool retrieve_all,
+                                  bool single_file_paired,
+                                  vector<string> kernel_options) const;
   vector<Occurrence> LocateOccs(string query) const;
+  vector<string> ExtractSequences(uint64_t position) const;
+
+    uint GetSizeBytes() const;
   void DetailedSpaceUssage() const;
   /*
   size_t GetLength() const {
@@ -84,6 +66,9 @@ class KernelManagerBowTie2 : public KernelManager {
 
  private:
   // Variables:
+  int verbose;
+  int n_threads;
+  uint my_size_in_bytes;
   size_t header_len;
   //size_t kernel_text_len;
 

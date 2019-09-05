@@ -3,103 +3,84 @@ package org.ngseq.panquery
 import java.io._
 import java.nio.ByteBuffer
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.client.{ConnectionFactory, Get}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.input_file_name
+import org.apache.hadoop.hbase.util.Bytes
 
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process._
 import scala.util.control.Breaks._
 
-object DistributedRLZ {
+object DistributedRLZHBase {
 
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
     import spark.implicits._
 
-    val dataPath = args(0)
-    val refSize = args(1).toInt // number of refs
+    val pgPath = args(0)
+    val splitPath = args(1) // number of refs
     val numSplits = args(2).toInt // control how many splits we want for the data
+    //val pgrefs = args(3).toInt //
 
     val radixSA = "./radixSA"
     val localIn = "radixin.txt"
     val localOut = "radixout.txt"
     val refParse = "./rlz_for_hybrid"
     val output = "merged.lz"
-    // download the data that is generated using vcf multialign
-    // get the file name (patient name) for fasta flag
 
-    val data = spark.read.text(dataPath)
+    //TODO:Load radix to hbase
+    // hbase org.apache.hadoop.hbase.mapreduce.ImportTsv -Dimporttsv.separator="," -Dimporttsv.columns=HBASE_ROW_KEY,pos radix hdfs://m1.novalocal:8020/user/root/radixout.txt
+
+    import java.util
+
+    import org.apache.hadoop.fs.FileSystem
+
+    val fs = FileSystem.get(new Configuration())
+    val pgFileList = new util.ArrayList[String]
+
+    val st = fs.listStatus(new Path(pgPath))
+    st.foreach{s=>
+        pgFileList.add(s.getPath.toUri.getRawPath)
+    }
+
+
+    /*val co = org.apache.hadoop.hbase.HBaseConfiguration.create()
+    co.addResource(new java.net.URL("file:////etc/hbase/3.1.0.0-78/0/hbase-site.xml"))
+    val con = ConnectionFactory.createConnection(co)
+
+    val table = con.getTable(TableName.valueOf("radix"))
+
+    val result=table.get(new Get("1".getBytes)).value()
+
+    println("RESULT::::::::::::::::"+Bytes.toString(result))*/
+
+
+    //TODO:splittaa data valmiiksi HDFSään(eri kansioihin) ja lue splitin pituus tiedostosta
+    //sed -i 's/./&\n/200;s/./&\n/500' ./t
+
+    //TODO: lue vain n ensimmäistä suoraan HDFS:Stä (aja Radix suoraan bash scriptistä n ensimmäiselle jo ennen DRLZtaa)
+
+    //TODO:Suffix for one HG is 29GB!Put suffix to HDFS and read from there
+    //TODO: compress suffix array and create reader(maybe BGZF+tabix? or LZ or create db index in HDFS)
+
+    println("loading to spark")
+
+
+    val nref = spark.read.text(pgFileList.get(0))
       .select(input_file_name, $"value")
       .as[(String, String)]
       .rdd
-    //val data = spark.sparkContext.wholeTextFiles(dataPath)//.sortBy(_._1)
-
-    val size = data.count()
-
-    // now hard coded ref
-    //val ref = data.take(1)//.slice(10000,150000)
-
-    // more flexible
-    val nref = data.take(refSize)
 
 
-    val splitted = data.zipWithIndex.flatMap{x =>
-      val fileName = x._1._1.split("/").last
-      val groups = x._1._2.grouped(x._1._2.length()/numSplits).toArray
-      //.zipWithIndex.map(y => (fileName,y._2,if(y._2==numSplits) y._1+"\n" else y._1))
-      //  .zipWithIndex.map(y => (fileName,y._2,y._1))
-      //val tmp = groups(groups.length-1)
-      //groups(groups.length-1) += "\n"
-      groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-    }.repartition((size*numSplits).toInt)
-
-    // call radixSA.value script to generate a file containing the
-    // suffix array for reference
-
-    // write ref to local
-    println("writing local")
-    val pw = new PrintWriter(new File(localIn))
-    //pw.write(">"+ref._1.split("/").last+"\n")
-    nref.foreach(x => pw.write(x._2))
-    pw.close()
-
-    val createSA = Process(radixSA + " " + localIn + " " + localOut).!
-    //println("sorting")
-    //val sorted = Process("sort -n " + localOut).lineStream
-
-    println("Load suffix")
-    val suffix = scala.io.Source.fromFile(localOut).getLines.toArray.map(_.toInt)
-
-    println("removing")
-    val removed = new File(localOut).delete()
-
-    // load the output
-    println("loading to spark")
-    // create a stream
-    //val SA_tmp = for(i <- sorted) yield {
-    //  val xSplit = i.split(" ")
-    //(xSplit(0).toInt,xSplit(1).toInt)
-    //  xSplit(1).toInt
-    //}
-
-    // create a hash table
-    //println("creating hashmap")
-    //val SA_hash = HashMap(SA_tmp: _*)
-    // broadcast the hash table
     println("broadcasting")
-    val SA = spark.sparkContext.broadcast(suffix)
+    val parsedRef = spark.sparkContext.broadcast(nref.collect().map(_._2).mkString(""))
 
-    // broadcast plain ref (needed for pattern matching)
-    //val reference = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
-    val reference = spark.sparkContext.broadcast(nref.map(_._2).mkString(""))
-
-    //val SA.value_tmp = Array(9, 4, 8, 6, 2, 3, 7, 5, 1).map(_ - 1).zipWithIndex.sortBy(_._1)
-    //val SA.value = HashMap(SA.value_tmp: _*)
-
-    //val d = "cabbaabba"
-    //val x = "ncabbaaabbaaa"
 
     // binary search that can find the upper and lower bounds
     // e.g for string 1111222555555666677 would return
@@ -109,14 +90,14 @@ object DistributedRLZ {
     // the ith positions are compared
     // essentially to find the longest match this function needs to called in loop
     // until the interval does not decrease
-    def binarySearch(lb: Int, rb: Int, d_b: Broadcast[String], cur: Char, i: Int, SA_b: Broadcast[Array[Int]]): Option[(Int, Int)] = {
+    def binarySearch(lb: Int, rb: Int, d_b: Broadcast[String], cur: Char, i: Int, SA_b: org.apache.hadoop.hbase.client.Table): Option[(Int, Int)] = {
       val d = d_b.value
       var low = lb
       var high = rb
       while (low < high) {
         val mid = low + ((high - low) / 2)
         // get the true position
-        val midKey = SA_b.value(mid) + i
+        val midKey =getValueAsInt(mid,SA_b) + i
 
         // different "layers"
         val midValue = if (midKey < d.length()) {
@@ -137,13 +118,13 @@ object DistributedRLZ {
       //println("----------------")
 
       // break if key not found
-      if ((SA_b.value(low_res) + i)>= d.length || d(SA_b.value(low_res) + i) != cur) {
+      if ((getValueAsInt(low_res,SA_b) + i)>= d.length || d(getValueAsInt(low_res,SA_b) + i) != cur) {
         return None
       }
       high = rb
       while (low < high) {
         val mid = low + ((high - low) / 2)
-        val midKey = SA_b.value(mid) + i
+        val midKey = getValueAsInt(mid,SA_b) + i
         // different "layers"
         val midValue = if (midKey < d.length()) {
           d(midKey)
@@ -158,7 +139,7 @@ object DistributedRLZ {
         }
       }
       //println("value: " + d(SA.value(low) + i) + " cur: " + cur + " lo: " + low)
-      if (SA_b.value(low) != d.length() - 1 && SA_b.value(low)+i< d.length() && d(SA_b.value(low) + i) != cur) {
+      if (getValueAsInt(low,SA_b) != d.length() - 1 && getValueAsInt(low,SA_b)+i< d.length() && d(getValueAsInt(low,SA_b) + i) != cur) {
         //if(low_res>low-1) {
         //  return Some((low_res,low))
         //}
@@ -176,9 +157,16 @@ object DistributedRLZ {
     //}
 
     // check newline to deal with partition borders (stop phrase search if goes
+    def getValueAsInt(x: Int, SA_b: org.apache.hadoop.hbase.client.Table): (Int) = {
+
+      val lb = x+1
+      Bytes.toString(SA_b.get(new Get(lb.toString.getBytes)).value()).toInt
+
+    }
     // to newline
-    def factor(i: Int, x: String, d_b: Broadcast[String], SA_b: Broadcast[Array[Int]]): (String, Long) = {
+    def factor(i: Int, x: String, d_b: Broadcast[String], SA_b: org.apache.hadoop.hbase.client.Table): (String, Long) = {
       val d = d_b.value
+
       var lb = 0
       var rb = d.length()-1 // check suffix array size
       var j = i
@@ -186,11 +174,11 @@ object DistributedRLZ {
         while (j < x.length()) {
           //println("j: " + j + " SA.value: " + SA.value(lb))
           //println((SA.value(lb)+j-i) + " " + d.length())
-          if((SA_b.value(lb)+j-i) >= d.length()) {
-            //println("breaking")
+          /*if((getValueAsInt(lb,SA_b)+j-i) >= d.length()) {
+            println("breaking?"+d.length())
             //break
-          }
-          if (lb == rb && d(SA_b.value(lb) + j - i) != x(j)) {
+          }*/
+          if (lb == rb && d(getValueAsInt(lb,SA_b) + j - i) != x(j)) {
             break
           }
           //(lb,rb) = refine(lb,rb,j-i,x(j))
@@ -237,18 +225,18 @@ object DistributedRLZ {
       } else {
         //println("täällä")
 
-        return (SA_b.value(lb).toString(), j - i)
+        return (getValueAsInt(lb,SA_b).toString(), j - i)
       }
     }
 
     // encode a single substring x
     // finds the longest possible match and returns
     // (pos,len) pair(s)
-    def encode(x: String, d_b: Broadcast[String],SA_b: Broadcast[Array[Int]]): ArrayBuffer[(String, Long)] = {
+    def encode(x: String, d_b: Broadcast[String],SA_b: org.apache.hadoop.hbase.client.Table): ArrayBuffer[(String, Long)] = {
       var i: Int = 0
       val max = Int.MaxValue
       val output = ArrayBuffer[(String, Long)]()
-      val d = d_b.value
+
       while (i < x.length()) {
         //println(i)
         val tup = factor(i, x, d_b,SA_b)
@@ -268,10 +256,48 @@ object DistributedRLZ {
     }
     println("started encoding")
     //val rsize = (ref._2.length()).toString
-    val filteredTmp = splitted.filter(x => !nref.map(_._1.split("/").last).contains(x._1))
-    //val maxSplit = filteredTmp.map(_._2).max()
-    val encoded = filteredTmp.map{x =>
-      val encodings = encode(x._4,reference,SA)
+    //val nonParsedRef = splitted.filter(x => !nref.map(_._1.split("/").last).contains(x._1))
+    //val maxSplit = nonParsedRef.map(_._2).max()
+    import spark.implicits._
+
+    /*val nonParsedRef = spark.read.text(splitPath)
+      .select(input_file_name, $"value")
+      .as[(String, String)]
+      .rdd.groupBy(g=>g._1).zipWithIndex.flatMap{v=>
+      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
+      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+      var i = 0
+      v._1._2.map(y => (y._1,(i+1),y._2.length.toLong,y._2))
+    }*/
+
+    val nonParsedRef = spark.read.text(splitPath).select(input_file_name, $"value")
+      .as[(String, String)]
+      .rdd.zipWithIndex.flatMap{x =>
+      val fileName = x._1._1.split("/").last
+      val groups = x._1._2.grouped(x._1._2.length()/numSplits).toArray
+      //.zipWithIndex.map(y => (fileName,y._2,if(y._2==numSplits) y._1+"\n" else y._1))
+      //  .zipWithIndex.map(y => (fileName,y._2,y._1))
+      //val tmp = groups(groups.length-1)
+      //groups(groups.length-1) += "\n"
+      groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+    }.repartition(numSplits)
+
+    val encoded = nonParsedRef.map{x =>
+      val conf = org.apache.hadoop.hbase.HBaseConfiguration.create()
+      conf.addResource(new java.net.URL("file:////etc/hbase/3.1.0.0-78/0/hbase-site.xml"))
+      val connection = ConnectionFactory.createConnection(conf)
+      val SA = connection.getTable(TableName.valueOf("radix"))
+
+      val i = 1
+      val scan=new org.apache.hadoop.hbase.client.Scan().withStartRow(i.toString.getBytes).withStopRow("100".getBytes)
+
+      println("SCAN::"+scan)
+
+      val test=SA.getScanner(scan).iterator()
+      while(test.hasNext)
+          println("TESTRS::::::::::::::::"+Bytes.toString(test.next().value()))
+
+      val encodings = encode(x._4,parsedRef,SA)
       //if(x._2==0) {
       //val newLine = (rsize,1L)
       //encodings.prepend(("\n",0))
@@ -279,14 +305,16 @@ object DistributedRLZ {
       //encodings += ("\n",0)
       //} else if(x._2 == 0) {
       //add fasta
-      //encodings.prependAll(encode("\n>"+x._1+"\n",reference,SA))
+      //encodings.prependAll(encode("\n>"+x._1+"\n",parsedRef,SA))
       //}
+      SA.close()
+      connection.close()
       ((x._1,x._2,x._3),encodings)
     }
-    //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,reference,SA)))
+    //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,parsedRef,SA)))
     //splitted.map(x => ((x._1,x._2),x._3)).sortBy(_._1).map(_._2).saveAsTextFile("real")
 
-    //compress reference using LZ77
+    //compress parsedRef using LZ77
 
     //turbofix to remove '\n'. Currently the algorithm does not seem to write out of ref alphabet
     //chars properly TODO!!
@@ -325,9 +353,9 @@ object DistributedRLZ {
       bos.write(tmp._2)
     }
     bos.close()
-    ordered.saveAsTextFile("out")
+    //ordered.saveAsTextFile("out")
     //println(ordered.map{x =>
-    //  if(x._2 == 0) x._1.toString else reference.value.slice(x._1.toInt,x._1.toInt+x._2.toInt).toString
+    //  if(x._2 == 0) x._1.toString else parsedRef.value.slice(x._1.toInt,x._1.toInt+x._2.toInt).toString
     //}.collect().foldLeft("")(_+_))
 
     spark.stop()

@@ -1,33 +1,14 @@
-/*
-	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
-
-	 This file is part of CHIC aligner.
-
-	 CHIC aligner is free software: you can redistribute it and/or modify
-	 it under the terms of the GNU General Public License as published by
-	 the Free Software Foundation, either version 3 of the License, or
-	 (at your option) any later version.
-
-	 CHIC aligner is distributed in the hope that it will be useful,
-	 but WITHOUT ANY WARRANTY; without even the implied warranty of
-	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	 GNU General Public License for more details.
-
-	 You should have received a copy of the GNU General Public License
-	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
+// Copyright Daniel Valenzuela
 #include "./utils.h"
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <math.h>
-#include <iostream>  // NOLINT
+#include <iostream>
 #include <sstream>
-#include <fstream>  // NOLINT
+#include <fstream>
 #include <string>
 #include <vector>
-#include "./occurrence.h"
 
 namespace Utils {
 
@@ -42,7 +23,7 @@ long double wclock() {
 FILE * OpenWriteOrDie(const char * filename) {
   FILE * fp = fopen(filename, "w");
   if (!fp) {
-    cerr << "Error opening file '" << filename << "' for writing." << endl;
+    cout << "Error opening file '" << filename << "' for writing." << endl;
     exit(EXIT_FAILURE);
   }
   return fp;
@@ -51,7 +32,7 @@ FILE * OpenWriteOrDie(const char * filename) {
 FILE * OpenWriteOrDie(char * filename) {
   FILE * fp = fopen(filename, "w");
   if (!fp) {
-    cerr << "Error opening file '" << filename << "' for writing." << endl;
+    cout << "Error opening file '" << filename << "' for writing." << endl;
     exit(EXIT_FAILURE);
   }
   return fp;
@@ -60,7 +41,7 @@ FILE * OpenWriteOrDie(char * filename) {
 FILE * OpenReadOrDie(char * filename) {
   FILE * fp = fopen(filename, "r");
   if (!fp) {
-    cerr << "Error opening file '" << filename << "' for readind." << endl;
+    cout << "Error opening file '" << filename << "' for readind." << endl;
     exit(EXIT_FAILURE);
   }
   return fp;
@@ -69,7 +50,7 @@ FILE * OpenReadOrDie(char * filename) {
 FILE * OpenReadOrDie(const char * filename) {
   FILE * fp = fopen(filename, "r");
   if (!fp) {
-    cerr << "Error opening file '" << filename << "' for readind." << endl;
+    cout << "Error opening file '" << filename << "' for readind." << endl;
     exit(EXIT_FAILURE);
   }
   return fp;
@@ -108,7 +89,7 @@ void DeleteFile(string filename) {
 
   printf("We wil call:\n %s\n command.", command_clean);
   if (system(command_clean)) {
-    cerr << "Command failed. " << endl;
+    cout << "Command failed. " << endl;
     exit(-1);
   }
 }
@@ -120,14 +101,70 @@ void DeleteTmpFile(string filename) {
 
   printf("We wil call:\n %s\n command.", command_clean);
   if (system(command_clean)) {
-    cerr << "Command failed. " << endl;
+    cout << "Command failed. " << endl;
     exit(-1);
   }
 #else
-  cerr << "Debug mode. File ' " << filename << "' will remain in disk" << endl;
+  cout << "Debug mode. File ' " << filename << "' will remain in disk" << endl;
 #endif
 }
 
+size_t CigarToLen(string cigar) {
+  if (cigar.size() == 1) {
+    ASSERT(cigar[0] == '*');
+    return 0;
+  }
+  size_t total = 0;
+  size_t i = 0;
+  while (i < cigar.size()) {
+    ASSERT(isdigit(cigar[i]));
+    size_t start_pos = i;
+    while (isdigit(cigar[i])) {
+      i++;
+    }
+    // cout << "Op pos is : "<< i << endl;
+    char op = cigar[i];
+    // cout << "Op is : "<< op << endl;
+
+    string num_token = cigar.substr(start_pos , i - start_pos);
+    // cout << "Num token: "<< num_token << endl;
+    if (op == 'M' || op == 'I' || op== 'X' || op== '=' || op == 'X') {
+      total += stoul(num_token);
+    }
+    i++;
+  }
+  // cout << "Returning: " << total << endl;
+  return total;
+}
+
+size_t CigarSoftClipped(string cigar) {
+  if (cigar.size() == 1) {
+    ASSERT(cigar[0] == '*');
+    return 0;
+  }
+  size_t total = 0;
+  size_t i = 0;
+  while (i < cigar.size()) {
+    ASSERT(isdigit(cigar[i]));
+    size_t start_pos = i;
+    while (isdigit(cigar[i])) {
+      i++;
+    }
+    // cout << "Op pos is : "<< i << endl;
+    char op = cigar[i];
+    // cout << "Op is : "<< op << endl;
+
+    string num_token = cigar.substr(start_pos , i - start_pos);
+    // cout << "Num token: "<< num_token << endl;
+    if (op == 'S') {
+      total += stoul(num_token);
+    }
+    i++;
+  }
+  return total;
+}
+
+// TODO: make it propper.
 string SamRecordForUnmapped(string read_name) {
   string ans = read_name + "\t4\t*\t0\t0\t*\t*\t*\t0\t0\t*";
   return ans;

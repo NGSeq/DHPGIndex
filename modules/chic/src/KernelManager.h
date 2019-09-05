@@ -1,22 +1,3 @@
-/*
-	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
-
-	 This file is part of CHIC aligner.
-
-	 CHIC aligner is free software: you can redistribute it and/or modify
-	 it under the terms of the GNU General Public License as published by
-	 the Free Software Foundation, either version 3 of the License, or
-	 (at your option) any later version.
-
-	 CHIC aligner is distributed in the hope that it will be useful,
-	 but WITHOUT ANY WARRANTY; without even the implied warranty of
-	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	 GNU General Public License for more details.
-
-	 You should have received a copy of the GNU General Public License
-	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef KERNELMANAGER_H_
 #define KERNELMANAGER_H_
 
@@ -52,6 +33,10 @@ class KernelManager {
   // Index construction:
   KernelManager() {
   };
+  KernelManager(uchar * text,
+                size_t len,
+                char * _kernel_text_filename,
+                int _verbose);
   void CreateKernelTextFile(uchar * kernel_text, size_t kernel_text_len);
   virtual void ComputeSize() = 0;
   virtual ~KernelManager() {};
@@ -62,22 +47,16 @@ class KernelManager {
 
   // Queries and accessors:
   virtual vector<Occurrence> LocateOccs(string query) const = 0;
-  virtual string  LocateOccsFQ(char * query_filename,
+  virtual vector<string> ExtractSequences(uint64_t position) const = 0;
+
+    virtual vector<Occurrence> LocateOccsFQ(char * query_filename,
                                           char * mates_filename,
                                           bool retrieve_all,
                                           bool single_file_paired,
                                           vector<string> kernel_options) const = 0;
+  virtual uint GetSizeBytes() const = 0;
   virtual void DetailedSpaceUssage() const = 0;
   //virtual size_t GetLength() const = 0;
-  uint GetSizeBytes() const {
-    return my_size_in_bytes;
-  }
-
- protected:
-  int verbose;
-  int n_threads;
-  int max_memory_MB;
-  uint my_size_in_bytes;
 
 };
 

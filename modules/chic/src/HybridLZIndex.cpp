@@ -685,7 +685,7 @@ void HybridLZIndex::Find(vector<uint64_t> * ans, string query) const {
   ASSERT(ans->size() == 0);
   //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
   ASSERT(query.size() <= max_query_len);
-  if (verbose >= 3) {
+  if (verbose >= 4) {
     cout << "Query string:" << endl;
     cout << query << endl;
   }
@@ -696,6 +696,28 @@ void HybridLZIndex::Find(vector<uint64_t> * ans, string query) const {
   for (size_t i = 0; i < my_occs.size(); i++) {
     ans->push_back(my_occs[i].GetPos());
   }
+}
+void HybridLZIndex::Find(vector<string> *ans, vector<uint64_t> position) const {
+    ASSERT(ans->size() == 0);
+    //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
+
+    /*if (verbose >= 4) {
+        cout << "Pos 0" << endl;
+        cout << position[0] << endl;
+    }*/
+
+
+    for (size_t i = 0; i < position.size(); i++) {
+        vector<string> my_seqs = kernel_manager->ExtractSequences(position[i]);
+
+        for (size_t j = 1; j < my_seqs.size(); j++) {
+            string s = my_seqs[j];
+            cout << "Sequence in position " << position[i] << " : "<< s << endl;
+        }
+
+
+        ans->push_back(my_seqs[i]);
+    }
 }
 
 // TODO: move somewhere

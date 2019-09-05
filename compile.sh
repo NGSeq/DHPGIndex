@@ -36,6 +36,5 @@ cp modules/chic/src/chic_align components/index/chic_align
 cp modules/chic/src/chic_map components/index/chic_map
 cp modules/radix/radixSA radixSA
 
-echo "Add pangenomics-0.9-jar-with-dependencies.jar to the root of the project."
-echo "Can be compiled with this: https://version.aalto.fi/gitlab/parallel/pangenomics"
+sbt compile
 

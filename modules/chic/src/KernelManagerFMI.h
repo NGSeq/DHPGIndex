@@ -1,22 +1,3 @@
-/*
-	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
-
-	 This file is part of CHIC aligner.
-
-	 CHIC aligner is free software: you can redistribute it and/or modify
-	 it under the terms of the GNU General Public License as published by
-	 the Free Software Foundation, either version 3 of the License, or
-	 (at your option) any later version.
-
-	 CHIC aligner is distributed in the hope that it will be useful,
-	 but WITHOUT ANY WARRANTY; without even the implied warranty of
-	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	 GNU General Public License for more details.
-
-	 You should have received a copy of the GNU General Public License
-	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef KERNELMANAGERFMI_H_
 #define KERNELMANAGERFMI_H_
 
@@ -64,19 +45,25 @@ class KernelManagerFMI : public KernelManager {
 
 
   // Queries and accessors:
-  string LocateOccsFQ(char * query_filename,
-                      char * mates_filename,
-                      bool retrieve_all,
-                      bool single_file_paired,
-                      vector<string> kernel_options) const;
+  vector<Occurrence> LocateOccsFQ(char * query_filename,
+                                  char * mates_filename,
+                                  bool retrieve_all,
+                                  bool single_file_paired,
+                                  vector<string> kernel_options) const;
   vector<Occurrence> LocateOccs(string query) const;
+  uint GetSizeBytes() const;
   void DetailedSpaceUssage() const;
   size_t GetLength() const {
     return kernel_text_len;
   }
 
+  vector<string> ExtractSequences(uint64_t position) const;
+
  private:
   // Variables:
+  int verbose;
+  int n_threads;
+  uint my_size_in_bytes;
   csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> index;
   size_t kernel_text_len;
 
