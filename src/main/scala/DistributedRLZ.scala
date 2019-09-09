@@ -313,6 +313,7 @@ object DistributedRLZ {
         posBytes = ByteBuffer.allocate(8).putLong(x._1(0).toLong).array.reverse
       }
       val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
+      println(x._1+","+len)
       (posBytes,lenBytes)
     }.toLocalIterator
 
@@ -321,6 +322,7 @@ object DistributedRLZ {
     while(local.hasNext) {
       //TODO: this is slow and spends memory! Write in map stage to numbered partitions as with Sparkbeagle and getmerge etc.
       val tmp = local.next
+      //println(tmp._1+","+tmp._2)
       bos.write(tmp._1)
       bos.write(tmp._2)
     }
