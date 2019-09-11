@@ -2,13 +2,11 @@ package org.ngseq.panquery
 
 import java.io._
 import java.net.URI
-import java.nio.ByteBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.hadoop.hdfs.DFSClient
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.input_file_name
 import xerial.larray.LArray
 
 import scala.collection.mutable.ArrayBuffer
@@ -57,6 +55,7 @@ object DistributedRLZLarray {
     st.foreach{s=>
         pgFileList.add(s.getPath.toUri.getRawPath)
     }
+    val reffile = pgFileList.get(0)
     val reflength = st(0).getLen
     println("REFLEN:::::"+reflength)
 
@@ -259,7 +258,7 @@ object DistributedRLZLarray {
       if (j == i) {
         return (split(j).toString(), 0)
       } else {
-        println(i+","+j)
+        //println(i+","+j)
         return (SA_b(lb).toString(), j - i)
       }
     }
@@ -275,7 +274,7 @@ object DistributedRLZLarray {
       val client = new DFSClient(URI.create("hdfs://m1.novalocal:8020"), new Configuration())
       var radixstream = client.open(radixFile)
       val bfr = new BufferedReader(new InputStreamReader(radixstream))
-      var refstream = client.open(refPath)
+      var refstream = client.open(reffile)
       val bfref = new BufferedReader(new InputStreamReader(refstream))
 
       val SA_b =  LArray.of[Long](reflen)
@@ -325,20 +324,29 @@ object DistributedRLZLarray {
     //val nonParsedRef = splitted.filter(x => !nref.map(_._1.split("/").last).contains(x._1))
     //val maxSplit = nonParsedRef.map(_._2).max()
     import spark.implicits._
-    val nonParsedRef = spark.read.text(splitPath)
-      .select(input_file_name, $"value")
+    /*val nonParsedRef = spark.read.text(splitPath)
+      .select(org.apache.spark.sql.functions.input_file_name, $"value")
       .as[(String, String)]
       .rdd.groupBy(g=>g._1).zipWithIndex.flatMap{v=>
       //val groups = v.grouped(x._1._2.length()/numSplits).toArray
       //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
       v._1._2.map(y => (y._1,v._2,y._2.length,y._2))
+    }*/
+
+    val nonParsedRef = spark.read.text(splitPath)
+      .select(org.apache.spark.sql.functions.input_file_name, $"value")
+      .as[(String, String)]
+      .rdd.map{v=>
+      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
+      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+     (v._1,v._2.length,v._2)
     }
 
     val encoded = nonParsedRef.map{x =>
       //val client = new DFSClient(URI.create("hdfs://m1.novalocal:8020"), new Configuration())
       //val SA = client.open("/user/root/radixout.txt")
 
-      val encodings = encode(x._4,rlen.value)
+      val encodings = encode(x._3,rlen.value)
       //if(x._2==0) {
       //val newLine = (rsize,1L)
       //encodings.prepend(("\n",0))
@@ -363,12 +371,11 @@ object DistributedRLZLarray {
     //val refLZ = LZ7.compress(ref._2)
 
     // order so that the output is written properly
-    val ordered = encoded.sortBy(_._1._2)
-    //ordered.saveAsTextFile("/yarn/total/")
+    val ordered = encoded.coalesce(numSplits).sortBy(_._1._2)
 
     // create bytearrays and collect to master via iterator (to prevent driver memory from
     // getting full)
-    //ordered.saveAsTextFile(hdfsout)
+   //encoded.saveAsTextFile(hdfsout)
 
     ordered.foreach{part=>
 
@@ -379,29 +386,13 @@ object DistributedRLZLarray {
 
      try {
         //val nf = new DecimalFormat("#0000000")
-        val fname = part._1._1.split("/")
+        val fname = part._1._1.toString.split("/")
 
         fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".pos"))
       } catch {
         case e: IOException =>
           e.printStackTrace()
       }
-
-      //val baos: BufferedOutputStream = new BufferedOutputStream(fos)
-      /*val len = x._2
-      if(len != 0) {
-        posBytes = ByteBuffer.allocate(8).putLong(x._1.toLong).array.reverse
-      }
-      else {
-        //posBytes = ByteBuffer.allocate(8).putLong(rsize).array.reverse
-        //len = 1
-        posBytes = ByteBuffer.allocate(8).putLong(x._1(0).toLong).array.reverse
-      }
-      val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
-      //(posBytes,lenBytes)
-
-      baos.write(posBytes)
-      baos.write(lenBytes)*/
 
       values.foreach{x =>
         //println(x._1+","+x._2)
@@ -422,7 +413,7 @@ object DistributedRLZLarray {
         //(posBytes,lenBytes)
         //val lenBytes = len.toString.getBytes
 
-        println(x._1,len)
+        //println(x._1,len)
         fos.write(posBytes)
         fos.write(lenBytes)
 
