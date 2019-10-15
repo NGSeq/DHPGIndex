@@ -2,6 +2,7 @@ package org.ngseq.panquery
 
 import java.io._
 import java.net.URI
+import java.nio.ByteBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
@@ -216,7 +217,7 @@ object DistributedRLZLarray {
             break
           }
           //(lb,rb) = refine(lb,rb,j-i,x(j))
-          val tmp = binarySearch(lb, rb.toInt, ref, split(j), j - i,SA_b)
+          val tmp = binarySearch(lb, rb, ref, split(j), j - i,SA_b)
           //println(tmp)
 
           // perhaps needs more rules
@@ -271,7 +272,7 @@ object DistributedRLZLarray {
       val max = Int.MaxValue
       val output = ArrayBuffer[(String, Int)]()
 
-      val client = new DFSClient(URI.create("hdfs://m1.novalocal:8020"), new Configuration())
+      val client = new DFSClient(URI.create("hdfs://ambari.novalocal:8020"), new Configuration())
       var radixstream = client.open(radixFile)
       val bfr = new BufferedReader(new InputStreamReader(radixstream))
       var refstream = client.open(reffile)
@@ -382,7 +383,7 @@ object DistributedRLZLarray {
       var values=part._2.toArray
 
       var fos: FSDataOutputStream = null
-      val fis = FileSystem.get(new URI("hdfs://m1.novalocal:8020"),new Configuration())
+      val fis = FileSystem.get(new URI("hdfs://ambari.novalocal:8020"),new Configuration())
 
      try {
         //val nf = new DecimalFormat("#0000000")
