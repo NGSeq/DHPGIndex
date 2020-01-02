@@ -3,7 +3,6 @@ package org.ngseq.panquery
 import java.io._
 import java.net.URI
 import java.nio.ByteBuffer
-import java.util
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
@@ -14,7 +13,32 @@ import scala.sys.process._
 import scala.util.control.Breaks._
 
 object DistributedRLZ2A {
+  def getsuf(SA_b: Array[Array[String]], lb: Long) : Long = {
 
+    val chunk = lb/(SA_b(0).length)
+    var index = lb-chunk*SA_b(0).length //10001-3*2501=2498 2501
+    if(index.toInt >= SA_b(chunk.toInt).length){
+      //10001 3 2498 2501 2498
+      //println(lb+" "+chunk+" "+index+" "+sa_len+" "+SA_b(chunk.toInt).length)
+      return 0L //TODO:radix is one char shorter than reference? fix..should last point to first or what?
+    }
+    val s = SA_b(chunk.toInt)(index.toInt).toLong
+    s
+  }
+
+
+  def getref(ref: Array[String], lb: Long): Char = {
+
+    val chunk = lb/ref(0).length
+    var index = lb-chunk*ref(0).length
+    if(index.toInt >= ref(chunk.toInt).length){
+      //10001 3 2498 2501 2498
+      //println(lb+" "+chunk+" "+index+" "+ref(0).length+" "+ref(chunk.toInt).length)
+      return 'N'
+    }
+    val r = ref(chunk.toInt)(index.toInt)
+    r
+  }
 
   def main(args: Array[String]) {
 
@@ -26,6 +50,8 @@ object DistributedRLZ2A {
     val radixFile = args(3)
     val hdfsout = args(4)
     val hdfsurl = args(5)
+    val reflength = args(6).toLong
+
 
 
     //val pgrefs = args(3).toInt //
@@ -47,30 +73,17 @@ object DistributedRLZ2A {
     // now hard coded ref
     //val ref = data.take(1)//.slice(10000,150000)
 
-    val fs = FileSystem.get(new Configuration())
-    val pgFileList = new util.ArrayList[String]
-
-    val st = fs.listStatus(new Path(splitPath))
-    st.foreach{s=>
-        pgFileList.add(s.getPath.toUri.getRawPath)
-    }
-    val reffile = pgFileList.get(0)
-    val reflength = st(0).getLen
+    //val reflength = st(0).getLen
     println("reffile:::::"+refPath)
     println("REFLEN:::::"+reflength)
 
     println("loading to spark")
 
-    val refdata1 = spark.sparkContext.textFile(refPath+"_r1").collect()
-    val refdata2 = spark.sparkContext.textFile(refPath+"_r2").collect()
-    val refdata3 = spark.sparkContext.textFile(refPath+"_r3").collect()
-    val refdata4 = spark.sparkContext.textFile(refPath+"_r4").collect()
+    val refdata1 = spark.sparkContext.textFile(refPath).collect()
 
-
-    val radixdata1 = spark.sparkContext.textFile(radixFile+"_r1").collect()
-    val radixdata2 = spark.sparkContext.textFile(radixFile+"_r2").collect()
-    val radixdata3 = spark.sparkContext.textFile(radixFile+"_r3").collect()
-    val radixdata4 = spark.sparkContext.textFile(radixFile+"_r4").collect()
+    val radixdata1 = spark.sparkContext.textFile(radixFile).coalesce(numSplits).mapPartitions(x=>{
+      Array(x.toArray).iterator
+    }).collect()
 
     /*    val client = new DFSClient(URI.create(hdfsurl), new Configuration())
         var radixstream = client.open(radixFile)
@@ -117,14 +130,9 @@ object DistributedRLZ2A {
     val rlen = spark.sparkContext.broadcast(reflength)
 
     val refbc1 = spark.sparkContext.broadcast(refdata1)
-    val refbc2 = spark.sparkContext.broadcast(refdata2)
-    val refbc3 = spark.sparkContext.broadcast(refdata3)
-    val refbc4 = spark.sparkContext.broadcast(refdata4)
 
     val SAbc1 = spark.sparkContext.broadcast(radixdata1)
-    val SAbc2 = spark.sparkContext.broadcast(radixdata2)
-    val SAbc3 = spark.sparkContext.broadcast(radixdata3)
-    val SAbc4 = spark.sparkContext.broadcast(radixdata4)
+
     //val parsedRef = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
     //val SA.value_tmp = Array(9, 4, 8, 6, 2, 3, 7, 5, 1).map(_ - 1).zipWithIndex.sortBy(_._1)
     //val SA.value = HashMap(SA.value_tmp: _*)
@@ -144,28 +152,15 @@ object DistributedRLZ2A {
 
       var low = lb
       var high = rb
-      val rlen = ref(0).length
       while (low < high) {
-        var mid = low + ((high - low) / 2)
+        val mid = low + ((high - low) / 2)
         // get the true position
 
-        //TODO: both arrays needed here, if midkey > high access upper half array
-        var midKey = 0L
-        var newmid = mid
-        if (mid > rlen){
-          newmid = mid-rlen
-          midKey = SA_b(1)(newmid.toInt).toLong + i
-        }
-        else
-          midKey = SA_b(0)(mid.toInt).toLong + i
-
+        val midKey = getsuf(SA_b,mid) + i
 
         // different "layers"
         val midValue = if (midKey < reflength) {
-          if (midKey > rlen)
-              ref(1)((midKey-rlen).toInt)
-          else
-              ref(0)(midKey.toInt)
+          getref(ref,midKey)
         } else {
           '1'
         }
@@ -177,7 +172,7 @@ object DistributedRLZ2A {
           low = mid + 1
         }
       }
-      var low_res = low
+      val low_res = low
       //println("low: " + low)
       //println("----------------")
 
@@ -185,47 +180,16 @@ object DistributedRLZ2A {
 
       //println(SA_b(low_res)+" + "+i+ " reflen"+ref.length+ " ref(SA_b(low_res) + i)" + (ref(SA_b(low_res) + i)) + "cur "+ cur)
 
-      //SELECT ARRAY
-      var saind = 0
-      var newlow_res = low_res
-      if (low_res > rlen){
-        newlow_res = low_res-rlen
-        saind = 1
-      }
-      val sabsum = SA_b(saind)(newlow_res.toInt).toLong+i
-      var referenceIndex = 0
-      var baseindex = sabsum
-      if (baseindex > rlen){
-        referenceIndex = 1
-        baseindex = (sabsum-rlen-1)
-      }
-      //END
-      val refbase = ref(referenceIndex)(baseindex.toInt)
-      if ( sabsum >= reflength)
+      if ((getsuf(SA_b,low_res) + i)>= reflength || getref(ref,getsuf(SA_b,low_res) + i) != cur) {
         return None
-      if ( refbase != cur)
-        return None
-
+      }
       high = rb
       while (low < high) {
-        var mid = low + ((high - low) / 2)
-        var midKey = 0L
-        var newmid = mid
-
-        if (mid > rlen){
-          newmid = mid-rlen-1
-          midKey = SA_b(1)(newmid.toInt).toLong + i
-        }
-        else
-          midKey = SA_b(0)(newmid.toInt).toLong + i
-
-
+        val mid = low + ((high - low) / 2)
+        val midKey = getsuf(SA_b,mid) + i
         // different "layers"
         val midValue = if (midKey < reflength) {
-          if (midKey > rlen)
-            ref(1)((midKey-rlen-1).toInt)
-          else
-            ref(0)(midKey.toInt)
+          getref(ref,midKey)
         } else {
           '1'
         }
@@ -238,24 +202,7 @@ object DistributedRLZ2A {
       }
       //println("value: " + d(SA.value(low) + i) + " cur: " + cur + " lo: " + low)
 
-      //SELECT ARRAY
-      var sind = 0
-      var newlow = low
-      if (low > rlen){
-        newlow = low-rlen-1
-        sind = 1
-      }
-      val sbs = SA_b(sind)(newlow.toInt).toLong+i
-      var refind = 0
-      var bind = sbs
-      if (bind > rlen){
-        refind = 1
-        bind = (sbs-rlen-1)
-      }
-      //END
-
-      val rbase = ref(refind)(bind.toInt)
-      if (SA_b(sind)(newlow.toInt).toLong != (reflength - 1) && sbs < reflength && rbase != cur) {
+      if (getsuf(SA_b,low) != reflength - 1 && getsuf(SA_b,low)+i < reflength && getref(ref,getsuf(SA_b,low) + i) != cur) {
         //if(low_res>low-1) {
         //  return Some((low_res,low))
         //}
@@ -274,33 +221,13 @@ object DistributedRLZ2A {
 
     // check newline to deal with partition borders (stop phrase search if goes
     // to newline
-    def factor(i: Int, split: String, ref: Array[String], SA_b: Array[Array[String]], reflen: Long): (String, Int) = {
+    def factor(i: Int, split: String, ref: Array[String], SA_b: Array[Array[String]]): (String, Int) = {
 
       var lb = 0L
-      var rb = reflen-1 // check suffix array size
+      var rb = reflength-1 // check ref size
       var j = i
-      var sai = 0
-      var lsb = 0
-      var rsb = 0
-      var rai = 0
-
       breakable {
         while (j < split.length()) {
-          if(lb >= reflen/2){
-            lsb = (lb - (reflen/2)-1).toInt
-            sai = 1
-          }else{
-            sai = 0
-            lsb = lb.toInt
-          }
-
-          if(rb >= reflen/2-1){
-            rsb = (rb - (reflen/2)-1).toInt
-            rai = 1
-          }else{
-            rai = 0
-            rsb = rb.toInt
-          }
           //println("j: " + j + " SA.value: " + SA.value(lb))
           //println((SA.value(lb)+j-i) + " " + d.length())
 
@@ -308,18 +235,8 @@ object DistributedRLZ2A {
             //println("breaking")
             //break
           }*/
-          if (lb == rb) {
-            val sabsum = SA_b(sai)(lsb).toLong + j - i
-            var right = 0
-            var sabsum_tmp = sabsum
-            if (sabsum >= reflen/2){
-              right = 1
-              sabsum_tmp = sabsum - (reflen/2)
-            }
-            val ray=ref(right)(sabsum_tmp.toInt)
-            val sp = split(j)
-            if (ray != sp)
-               break
+          if (lb == rb && getref(ref, getsuf(SA_b,lb) + j - i) != split(j)) {
+            break
           }
           //(lb,rb) = refine(lb,rb,j-i,x(j))
           val tmp = binarySearch(lb, rb, ref, split(j), j - i,SA_b)
@@ -365,8 +282,7 @@ object DistributedRLZ2A {
         return (split(j).toString(), 0)
       } else {
         //println(i+","+j)
-        val ret = SA_b(sai)(lsb).toString()
-        return (ret, j - i)
+        return (getsuf(SA_b,lb).toString(), j - i)
       }
     }
 
@@ -380,13 +296,13 @@ object DistributedRLZ2A {
 
 
 
-      val SA_b = Array(SAbc1.value,SAbc2.value)
-      val ref = Array(refbc1.value(0),refbc2.value(0))
+      val SA_b = Array(SAbc1.value(0))
+      val ref = Array(refbc1.value(0))
 
       while (i < split.length) {
         //println(i)
 
-        val tup = factor(i, split, ref, SA_b, reflen)
+        val tup = factor(i, split, ref, SA_b)
         //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         output += tup
         if (tup._2 == 0) {
@@ -424,7 +340,7 @@ object DistributedRLZ2A {
       .rdd.map{v=>
       //val groups = v.grouped(x._1._2.length()/numSplits).toArray
       //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-     (v._1,v._2.length,v._2)
+      (v._1,v._2.length,v._2)
     }
 
     val encoded = nonParsedRef.map{x =>
@@ -460,7 +376,7 @@ object DistributedRLZ2A {
 
     // create bytearrays and collect to master via iterator (to prevent driver memory from
     // getting full)
-   //encoded.saveAsTextFile(hdfsout)
+    //encoded.saveAsTextFile(hdfsout)
 
     ordered.foreach{part=>
 
@@ -469,7 +385,7 @@ object DistributedRLZ2A {
       var fos: FSDataOutputStream = null
       val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
 
-     try {
+      try {
         //val nf = new DecimalFormat("#0000000")
         val fname = part._1._1.toString.split("/")
 
@@ -510,8 +426,8 @@ object DistributedRLZ2A {
         case e: IOException =>
           e.printStackTrace()
       }*/
-     //baos.close()
-     fos.close()
+      //baos.close()
+      fos.close()
 
     }
 

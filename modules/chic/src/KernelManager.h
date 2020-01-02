@@ -47,7 +47,7 @@ class KernelManager {
 
   // Queries and accessors:
   virtual vector<Occurrence> LocateOccs(string query) const = 0;
-  virtual vector<string> ExtractSequences(uint64_t position) const = 0;
+  virtual vector<string> ExtractSequences(uint64_t position, uint64_t range) const = 0;
 
     virtual vector<Occurrence> LocateOccsFQ(char * query_filename,
                                           char * mates_filename,

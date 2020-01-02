@@ -31,7 +31,8 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
   exit(-1);
 #else
-  string bt2_command_index = string(PROJECT_ROOT);
+  //string bt2_command_index = string(PROJECT_ROOT);
+  string bt2_command_index = "";
   bt2_command_index += "bowtie2-build --threads "+std::to_string(n_threads);
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " " + kernel_text_filename;
@@ -48,7 +49,7 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
   }
 #endif
 
-  Utils::DeleteTmpFile(kernel_text_filename);
+  //Utils::DeleteTmpFile(kernel_text_filename);
   ComputeSize();
 }
 
@@ -111,11 +112,11 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
     cerr << "Single file with paired end read not supported by BowTie2 Kernel" << endl;
     exit(2);
   }
-  for (size_t i = 0; i < kernel_options.size(); i++) {
+  /*for (size_t i = 0; i < kernel_options.size(); i++) {
     all_flags += " "+kernel_options[i];
-  }
-  bt2_command_align.assign(PROJECT_ROOT);
-  bt2_command_align += "bowtie2-2.2.9/bowtie2 " + all_flags;
+  }*/
+  //bt2_command_align.assign(PROJECT_ROOT);
+  bt2_command_align = "bowtie2 " + all_flags;
   bt2_command_align += " -x " + kernel_text_filename;  // we have used kernel_text_filename as basename for the index, should be ok.
   if (mates_filename == NULL) {
     bt2_command_align += " -U "+ string(query_filename);
@@ -150,6 +151,17 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccs(string query) const {
   cerr << "KernelManagerBowTie2 is not ready to do this " << endl;
   cerr << "We will ignore query: " << query << " and abort..." << endl;
   exit(EXIT_FAILURE);
+}
+
+
+vector<string>  KernelManagerBowTie2::ExtractSequences(uint64_t position, uint64_t range) const {
+    const std::basic_string<char> &seqs = extract(index, position-range, position+range);
+    vector<string> ans;
+    ans.reserve(seqs.size());
+    for (size_t i = 0; i < seqs.size(); i++) {
+        ans.push_back(seqs);
+    }
+    return ans;
 }
 
 // ***********************************

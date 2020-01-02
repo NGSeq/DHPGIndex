@@ -184,6 +184,7 @@ int main(int argc, char **argv) {
   long double t1, t2;
 
   t1 = Utils::wclock();
+  //TODO: separate kernelize and indexing, apply kernelization to spark drlz code (kernel per chr)
   HybridLZIndex * index = new HybridLZIndex(parameters);
   index->Save();
   t2 = Utils::wclock();

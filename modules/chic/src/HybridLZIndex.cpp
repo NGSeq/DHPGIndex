@@ -117,6 +117,7 @@ void HybridLZIndex::Kernelize() {
   uint64_t *tmp_limits_kernel;
   uchar *kernel_text;
 
+  long t1 = Utils::wclock();
   MyBuffer * my_buffer;
   if (lz_method == LZMethod::IN_MEMORY) {
     my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
@@ -128,9 +129,15 @@ void HybridLZIndex::Kernelize() {
       my_buffer = new MyBufferPlainFile(text_filename);
     }
   }
+
+
   MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
+  long t2 = Utils::wclock();
+  cout << "MakeKernelString: "<< (t2-t1) << " seconds. " << endl;
+
   delete(my_buffer);
 
+    long k1 = Utils::wclock();
   if (kernel_type == KernelType::FMI) {
     kernel_manager = new KernelManagerFMI(kernel_text,
                                           kernel_text_len,
@@ -150,7 +157,10 @@ void HybridLZIndex::Kernelize() {
     cerr << "Unknown kernel type given" << endl;
     exit(EXIT_FAILURE);
   }
-  delete [] kernel_text;
+  long k2 = Utils::wclock();
+  cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
+
+    delete [] kernel_text;
 
   EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
   delete [] tmp_limits_kernel;
@@ -161,6 +171,7 @@ void HybridLZIndex::Kernelize() {
 
 // Assumes that the resulting kernel string fits in main memory.
 // That is OK, as we will need to index it, so this is a hard limit for now.
+//TODO: Do this in partitions and merge kerneltext in the end
 void HybridLZIndex::MakeKernelString(MyBuffer * is,
                                      uchar ** kernel_ans,
                                      uint64_t ** tmp_limits_kernel_ans) {
@@ -603,6 +614,8 @@ void HybridLZIndex::DetailedSpaceUssage() const {
   cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
 }
 
+
+
 ////////////////////////////////
 // Queries functions:
 ////////////////////////////////
@@ -681,6 +694,90 @@ void HybridLZIndex::FindFQ2(char * alignment_filename,
   }
 }
 
+void HybridLZIndex::FindALL(vector<Occurrence> my_occs,
+                           char * query_filename,
+                           char * mates_filename,
+                           bool single_file_paired,
+                           SecondaryReportType secondary_report,
+                           vector<string> kernel_options,
+                           ostream& my_out) const {
+
+    size_t all_occs_in_kernel = my_occs.size();
+    if (verbose >= 2) {
+        cout << "Occurrences mapped to kernel: " << all_occs_in_kernel << endl;
+    }
+    vector<Occurrence> lost_occs;
+    if (all_occs_in_kernel > 0) { // seems redundant.
+        for (size_t i = 0; i < all_occs_in_kernel; i++) {
+            if (my_occs[i].IsUnmapped()) {
+
+                    cout << "Discarding unmapped read from alignments to kernel" << endl;
+
+                continue;
+            }
+            uint64_t next_limit_pos = 0;
+            uint prev_limit;
+            uint64_t pos_in_text = MapKernelPosToTextPos(my_occs[i].GetPos(),
+                                                         &next_limit_pos,
+                                                         & prev_limit);
+            cout << "Position in real text:" << pos_in_text << endl;
+            cout << "Position in kernel:" << my_occs[i].GetPos() << endl;
+            //book_keeper->NormalizeOutput(my_occs[i]);
+            //cout << "Normalized pos :" << my_occs[i].GetPos() << endl;
+            //TODO: store sequence(chr) lengths in file and calculate ancsestor from real text position, put ancestor in occurrence message
+
+            cout << "name:" << my_occs[i].GetReadName() << endl;
+            cout << "len:" << my_occs[i].GetLength() << endl;
+            cout << "message:" << my_occs[i].GetMessage() << endl;
+            vector<string> my_seqs = kernel_manager->ExtractSequences(pos_in_text, my_occs[i].GetLength());
+            for (size_t j = 1; j < my_seqs.size(); j++) {
+                string s = my_seqs[j];
+                cout << "Sequence in position " << pos_in_text << " : "<< s << " :: " << endl;
+                cout << "WTF" << endl;
+            }
+
+            if (next_limit_pos <= my_occs[i].GetPos() + my_occs[i].GetLength() - 1 ||
+                tsrr->IsLiteral(prev_limit)) {
+                my_occs[i].UpdatePos(pos_in_text);
+            } else {
+                lost_occs.push_back(my_occs[i]);
+                if (verbose >= 3) {
+                    cout << "Warning: if we had a kernel that could handle the special separators" << endl;
+                    cout << "as characters that differ from everything else (as opposed to N's) "<< endl;
+                    cout << "then this should never happen. Here we are losing a mapped read. "<< endl;
+                    cout << "It may be the case that there was another position where it could be mapped, but this artifact alignment";
+                    cout << "took presedence over the next one" << endl;
+                    cout << "*********" << endl;
+                    cout << "We just lost read aligned to Kernel Pos:" << my_occs[i].GetPos();
+                    cout << "*********" << endl;
+                }
+            }
+        }
+    }
+    size_t tot_map_to_kernel = my_occs.size();
+
+        cout << "Total occurrence mapped  to the kernel:" << tot_map_to_kernel << endl;
+    cout << "Total not mapped  to the kernel:" << lost_occs.size() << endl;
+    // TODO:
+    // This is the BAM header, probable KernelBWA should take care of this...
+
+    /*for (size_t i = 0; i < my_occs.size(); i++) {
+       //cout << "Occurrence:" << endl;
+        cout << my_occs[i].GetMessage() << endl;
+    }
+    for (size_t i = 0; i < my_occs.size(); i++) {
+        cout << "Normalized Occurrences:" << endl;
+        book_keeper->NormalizeOutput(my_occs[i]);
+        cout << my_occs[i].GetMessage() << endl;
+    }*/
+
+    if (secondary_report == SecondaryReportType::ALL ||
+           secondary_report == SecondaryReportType::LZ) {
+        searchSecondaryOcc(&my_occs);
+    }
+
+}
+
 void HybridLZIndex::Find(vector<uint64_t> * ans, string query) const {
   ASSERT(ans->size() == 0);
   //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
@@ -697,7 +794,25 @@ void HybridLZIndex::Find(vector<uint64_t> * ans, string query) const {
     ans->push_back(my_occs[i].GetPos());
   }
 }
-void HybridLZIndex::Find(vector<string> *ans, vector<uint64_t> position) const {
+
+void HybridLZIndex::FindPatterns(vector<Occurrence> * ans, string query) const {
+    ASSERT(ans->size() == 0);
+    //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
+    ASSERT(query.size() <= max_query_len);
+    if (verbose >= 4) {
+        cout << "Query string:" << endl;
+        cout << query << endl;
+    }
+    vector<Occurrence> my_occs;
+
+    FindPrimaryOccs(&my_occs, query);
+    //searchSecondaryOcc(&my_occs);
+    for (size_t i = 0; i < my_occs.size(); i++) {
+        ans->push_back(my_occs[i]);
+    }
+}
+
+void HybridLZIndex::Find(vector<string> *ans, vector<uint64_t> position, uint64_t range) const {
     ASSERT(ans->size() == 0);
     //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
 
@@ -708,12 +823,26 @@ void HybridLZIndex::Find(vector<string> *ans, vector<uint64_t> position) const {
 
 
     for (size_t i = 0; i < position.size(); i++) {
-        vector<string> my_seqs = kernel_manager->ExtractSequences(position[i]);
-
+        vector<string> my_seqs = kernel_manager->ExtractSequences(position[i], range);
+        cout << my_seqs[0] <<  " :: " << endl;
+        cout << my_seqs[1] <<  " :: " << endl;
+        cout << my_seqs[2] <<  " :: " << endl;
+        cout << my_seqs[3] <<  " :: " << endl;
+        cout << my_seqs[4] <<  " :: " << endl;
+        cout << "BLB" << endl;
         for (size_t j = 1; j < my_seqs.size(); j++) {
             string s = my_seqs[j];
-            cout << "Sequence in position " << position[i] << " : "<< s << endl;
+            cout << "Sequence in position " << position[i] << " : "<< s << " :: " << endl;
+            cout << "WTF" << endl;
         }
+
+        /*const std::basic_string<char> &seqs = extract(index, position-range, position+range);
+        vector<string> ans;
+        ans.reserve(seqs.size());
+        for (size_t i = 0; i < seqs.size(); i++) {
+            ans.push_back(seqs);
+        }
+        return ans;*/
 
 
         ans->push_back(my_seqs[i]);
@@ -885,8 +1014,14 @@ void HybridLZIndex::FindPrimaryOccs(vector<Occurrence> * ans, string query) cons
   vector<Occurrence> locations = kernel_manager->LocateOccs(query);
   // TODO: may be more efficient if we change the signature of this method, and we return locations.
   // we will need to do in-place filter instead of the push_backs that follows.
+
   size_t all_occs_in_kernel = locations.size();
-  if (all_occs_in_kernel > 0) {  // TODO: this if seems redundant too
+    for (size_t i = 0; i < all_occs_in_kernel; i++) {
+
+            ans->push_back(locations[i]);
+
+    }
+  /*if (all_occs_in_kernel > 0) {  // TODO: this if seems redundant too
     for (size_t i = 0; i < all_occs_in_kernel; i++) {
       uint64_t next_limit_pos = 0;
       uint prev_limit;
@@ -899,7 +1034,7 @@ void HybridLZIndex::FindPrimaryOccs(vector<Occurrence> * ans, string query) cons
         ans->push_back(locations[i]);
       }
     }
-  }
+  }*/
 }
 
 void HybridLZIndex::searchSecondaryOcc(vector<Occurrence> * ans,
@@ -939,7 +1074,7 @@ uint64_t HybridLZIndex::MapKernelPosToTextPos(uint64_t pos,
   ASSERT(succ > 0);
   *pred = succ-1;
   uint64_t offset = (*_next_limit_pos) - pos;
-
+    cout << "SUCCessor: "<< succ << endl;
   return GetLimit(succ) - offset;
 }
 

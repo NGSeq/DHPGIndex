@@ -27,6 +27,7 @@ using sdsl::csa_wt;
 using sdsl::wt_huff;
 using sdsl::rrr_vector;
 using sdsl::construct;
+using sdsl::extract;
 
 class KernelManagerBowTie2 : public KernelManager {
  public:
@@ -53,11 +54,13 @@ class KernelManagerBowTie2 : public KernelManager {
                                   bool single_file_paired,
                                   vector<string> kernel_options) const;
   vector<Occurrence> LocateOccs(string query) const;
-  vector<string> ExtractSequences(uint64_t position) const;
 
     uint GetSizeBytes() const;
   void DetailedSpaceUssage() const;
-  /*
+
+  vector<string> ExtractSequences(uint64_t position, uint64_t range) const;
+
+    /*
   size_t GetLength() const {
     return kernel_text_len;
   }
@@ -69,6 +72,8 @@ class KernelManagerBowTie2 : public KernelManager {
   int verbose;
   int n_threads;
   uint my_size_in_bytes;
+  csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> index;
+
   size_t header_len;
   //size_t kernel_text_len;
 

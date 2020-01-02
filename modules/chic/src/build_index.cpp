@@ -8,7 +8,7 @@
 
 void suggest_help();
 void suggest_help(char ** argv) {
-  cout << "For help, type " << argv[0] << " --help" << endl;
+  cout << "For  help, type " << argv[0] << " --help" << endl;
 }
 
 void print_help();

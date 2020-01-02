@@ -54,7 +54,9 @@ typedef struct {
   int verbose;
   vector<string> kernel_options;
   int validation_test;
-  char * search_test;
+  char * search_positions;
+  bool search_patterns;
+  uint64_t range;
 } Parameters;
 
 
@@ -86,11 +88,14 @@ vector<uint64_t > LoadPositions(char * filename);
 
 void search_test(Parameters *parameters, HybridLZIndex *pIndex);
 
+void search_patterns(Parameters *parameters, HybridLZIndex *pIndex);
+
 int main(int argc, char *argv[]) {
   Parameters * parameters  = new Parameters();
   // default values:
   parameters->validation_test = false;
-  parameters->search_test = NULL;
+  parameters->search_positions = NULL;
+  parameters->search_patterns = false;
   parameters->input_type = InputType::PLAIN;
   parameters->output_filename = NULL;
   parameters->verbose = 1;
@@ -98,18 +103,21 @@ int main(int argc, char *argv[]) {
   parameters->n_threads = 1;
   parameters->mates_filename = NULL;
   parameters->interleaved_mates = false;
+  parameters->range = 20;
 
   while (1) {
     static struct option long_options[] = {
       /* These options set a flag. */
       {"validation_test", no_argument,  &(parameters->validation_test), 1},  // NO NEED TO DO ANYTHING ELSE :)
-      {"search_test", required_argument,  0, 'f'},  // NO NEED TO DO ANYTHING ELSE :)
+      {"search_positions", required_argument,  0, 'f'},  // NO NEED TO DO ANYTHING ELSE :)
             /* These options don’t set a flag.
                We distinguish them by their indices. */
+      {"search_patterns", required_argument,  0, 'l'},
       {"output",    required_argument, 0, 'o'},
       {"input",    required_argument, 0, 'i'},
       {"secondary_report", required_argument, 0, 's'},
       {"threads",    required_argument, 0, 't'},
+      {"range",    required_argument, 0, 'r'},
       {"verbose",    required_argument, 0, 'v'},
       {"interleaved-reads",    no_argument, 0, 'p'},
       {"kernel-options", required_argument, 0, 'K'},
@@ -119,7 +127,7 @@ int main(int argc, char *argv[]) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "f:o:i:s:t:v:p:K:h", long_options, &option_index);
+    int c = getopt_long(argc, argv, "f:o:i:s:t:v:p:K:h:r:l", long_options, &option_index);
 
     /* Detect the end of the options. */
     if (c == -1)
@@ -136,8 +144,14 @@ int main(int argc, char *argv[]) {
         printf("\n");
         break;
 
+      case 'r':
+            parameters->range = atoll(optarg);
+            break;
       case 'f':
-            parameters->search_test = optarg;
+            parameters->search_positions = optarg;
+            break;
+      case 'l':
+            parameters->search_patterns = optarg;
             break;
       case 'h':
         print_help();
@@ -200,7 +214,7 @@ int main(int argc, char *argv[]) {
 
   int rest = argc - optind;
   if (rest != 2 && rest != 3) {
-    cout << "Incorrect number of arguments." << endl;
+    cout << "Incorrect number of arguments. " << endl;
     suggest_help(argv);
     exit(-1);
   }
@@ -223,11 +237,14 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////////////////////////
   // FROM HERE ON START ACTING ACCORDING TO PARAMS:
   ///////////////////////////////////////////////////
-  if (parameters->search_test)
+  if (parameters->search_positions)
         search_test(parameters, my_index);
   if (parameters->validation_test) {
-    validation_test(parameters, my_index);
-  } else if (parameters->input_type == InputType::FQ) {
+        validation_test(parameters, my_index);
+  }
+  if (parameters->search_patterns==true) {
+    search_patterns(parameters, my_index);
+  }else if (parameters->input_type == InputType::FQ) {
     if (parameters->output_filename == NULL) {
       my_index->FindFQ(parameters->patterns_filename,
                        parameters->mates_filename,
@@ -248,7 +265,28 @@ int main(int argc, char *argv[]) {
                        my_out);
       my_out.close();
     }
-  } else {
+  } else if (parameters->input_type == InputType::PLAIN) {
+
+      vector<string> patterns;
+      patterns = LoadPatterns(parameters->patterns_filename, my_index->GetMaxQueryLen());
+      long double t1, t2;
+      t1 = Utils::wclock();
+      size_t count = 0;
+      vector<Occurrence> occsu;
+      for (size_t i = 0; i < patterns.size(); i++) {
+
+          my_index->FindPatterns(&occsu, patterns[i]);
+          count += occsu.size();
+      }
+
+      my_index->FindALL(occsu,
+                        parameters->patterns_filename,
+                           parameters->mates_filename,
+                           parameters->interleaved_mates,
+                           parameters->secondary_report,
+                           parameters->kernel_options,
+                           cout);
+ }else {
     timing_test(parameters, my_index);
   }
 
@@ -257,15 +295,43 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
+void search_patterns(Parameters *parameters, HybridLZIndex *my_index) {
+    vector<string> patterns;
+    patterns = LoadPatterns(parameters->patterns_filename, my_index->GetMaxQueryLen());
+    long double t1, t2;
+    t1 = Utils::wclock();
+    size_t count = 0;
+    vector<Occurrence> occsu;
+    for (size_t i = 0; i < patterns.size(); i++) {
+
+        my_index->FindPatterns(&occsu, patterns[i]);
+        count += occsu.size();
+    }
+
+    for (size_t i = 0; i < occsu.size(); i++) {
+        cout << occsu[i].GetMessage() << " len " << occsu[i].GetLength() << " pos " << occsu[i].GetPos() << " isunmapped " << occsu[i].IsUnmapped() <<endl;
+    }
+    cout << occsu[1].GetReadName() << " aa " << endl;
+    cout << occsu[2].GetReadName() << " aa " << endl;
+    cout << occsu[10].GetReadName() << " aa " << endl;
+
+
+    t2 = Utils::wclock();
+    cout << count << " occurrences reported." << endl;
+    cout << "All queries in: "<< (t2-t1) << " seconds. " << endl;
+    cout << "Avg query in: " << (t2-t1)/patterns.size() << "Seconds" << endl;
+    Success();
+}
+
 void search_test(Parameters *parameters, HybridLZIndex *index) {
-    vector<uint64_t> positions = LoadPositions(parameters->search_test);
+    vector<uint64_t> positions = LoadPositions(parameters->search_positions);
     /*for (uint64_t i = 1; i < 10; i++) {
         uint64_t p = i*10;
         positions.push_back(p);
     }*/
 
     vector<string> seqs;
-    index->Find(&seqs, positions);
+    index->Find(&seqs, positions,parameters->range);
 }
 
 void timing_test(Parameters * parameters,

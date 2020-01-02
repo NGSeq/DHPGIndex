@@ -57,7 +57,7 @@ class KernelManagerFMI : public KernelManager {
     return kernel_text_len;
   }
 
-  vector<string> ExtractSequences(uint64_t position) const;
+  vector<string> ExtractSequences(uint64_t position, uint64_t range) const;
 
  private:
   // Variables:

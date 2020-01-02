@@ -281,6 +281,7 @@ object DistributedRLZ {
       //add fasta
       //encodings.prependAll(encode("\n>"+x._1+"\n",reference,SA))
       //}
+
       ((x._1,x._2,x._3),encodings)
     }
     //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,reference,SA)))
@@ -313,7 +314,6 @@ object DistributedRLZ {
         posBytes = ByteBuffer.allocate(8).putLong(x._1(0).toLong).array.reverse
       }
       val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
-      println(x._1+","+len)
       (posBytes,lenBytes)
     }.toLocalIterator
 
@@ -327,7 +327,7 @@ object DistributedRLZ {
       bos.write(tmp._2)
     }
     bos.close()
-    ordered.saveAsTextFile("out")
+    //ordered.saveAsTextFile("out")
     //println(ordered.map{x =>
     //  if(x._2 == 0) x._1.toString else reference.value.slice(x._1.toInt,x._1.toInt+x._2.toInt).toString
     //}.collect().foldLeft("")(_+_))

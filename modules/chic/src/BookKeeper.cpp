@@ -170,7 +170,11 @@ void BookKeeper::NormalizeOutput(Occurrence& occ) {
   size_t kernel_pos = occ.GetPos();
   size_t offset = 0;
   size_t doc_id;
-  ASSERT(n_seqs == seq_lengths.size());
+    cout << "KPOS" << kernel_pos << endl;
+
+    cout << "SEQQ LEN" << seq_lengths.size() << endl;
+    cout << "nseqs" << n_seqs << endl;
+    ASSERT(n_seqs == seq_lengths.size());
   size_t prev = 0;
   for (doc_id = 0; doc_id < seq_lengths.size(); doc_id++) {
     prev = offset;

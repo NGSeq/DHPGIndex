@@ -32,7 +32,7 @@ KernelManagerFMI::KernelManagerFMI(uchar * text,
   construct(index, kernel_text_filename.c_str(), 1);
   my_size_in_bytes += sdsl::size_in_bytes(index);
   kernel_text_len = index.size() - 1;
-  Utils::DeleteTmpFile(kernel_text_filename);
+  //Utils::DeleteTmpFile(kernel_text_filename);
   ComputeSize();
 }
 
@@ -69,8 +69,8 @@ vector<Occurrence>  KernelManagerFMI::LocateOccs(string query) const {
   return ans;
 }
 
-vector<string>  KernelManagerFMI::ExtractSequences(uint64_t position) const {
-    const std::basic_string<char> &seqs = extract(index, position-20, position+20);
+vector<string>  KernelManagerFMI::ExtractSequences(uint64_t position,uint64_t range) const {
+    const std::basic_string<char> &seqs = extract(index, position-range, position+range);
     vector<string> ans;
     ans.reserve(seqs.size());
     for (size_t i = 0; i < seqs.size(); i++) {

@@ -53,7 +53,7 @@ class KernelManagerBWA : public KernelManager {
                                   bool single_file_paired,
                                   vector<string> kernel_options) const;
   vector<Occurrence> LocateOccs(string query) const;
-  vector<string> ExtractSequences(uint64_t position) const;
+  vector<string> ExtractSequences(uint64_t position, uint64_t range) const;
 
     uint GetSizeBytes() const;
   void DetailedSpaceUssage() const;
@@ -69,6 +69,7 @@ class KernelManagerBWA : public KernelManager {
   int verbose;
   int n_threads;
   uint my_size_in_bytes;
+  csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> index;
   size_t header_len;
   //size_t kernel_text_len;
 

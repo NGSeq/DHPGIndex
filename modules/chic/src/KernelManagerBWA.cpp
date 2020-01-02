@@ -49,7 +49,7 @@ KernelManagerBWA::KernelManagerBWA(uchar * input_kernel_text,
   delete[] command_bwa_index;
 #endif
 
-  Utils::DeleteTmpFile(kernel_text_filename);
+  //Utils::DeleteTmpFile(kernel_text_filename);
   ComputeSize();
 }
 
@@ -99,7 +99,7 @@ vector<Occurrence>  KernelManagerBWA::LocateOccsFQ(char * query_filename,
   exit(-1);
 #else
   string  tmp_out_filename = "./.reads_aligned_to_kernel.sam";  // TODO: a better name ?
-  string command_bwa_mem;
+  string command_bwa_mem = "";
   string all_flags;
   if (retrieve_all) {
     all_flags.assign(" -a");
@@ -110,10 +110,10 @@ vector<Occurrence>  KernelManagerBWA::LocateOccsFQ(char * query_filename,
     all_flags += " -p";
   }
   all_flags += " -t"+std::to_string(n_threads);
-  for (size_t i = 0; i < kernel_options.size(); i++) {
+  /*for (size_t i = 0; i < kernel_options.size(); i++) {
     all_flags += " "+kernel_options[i];
-  }
-  command_bwa_mem.assign(PROJECT_ROOT);
+  }*/
+  //command_bwa_mem.assign(PROJECT_ROOT);
   command_bwa_mem += "bwa mem " + all_flags;
   command_bwa_mem += " " + kernel_text_filename;
   command_bwa_mem += " " + string(query_filename);
@@ -147,6 +147,16 @@ vector<Occurrence>  KernelManagerBWA::LocateOccs(string query) const {
   cerr << "KernelManagerBWA is not ready to do this " << endl;
   cerr << "We will ignore query: " << query << " and abort..." << endl;
   exit(EXIT_FAILURE);
+}
+
+vector<string>  KernelManagerBWA::ExtractSequences(uint64_t position, uint64_t range) const {
+    const std::basic_string<char> &seqs = extract(index, position-range, position+range);
+    vector<string> ans;
+    ans.reserve(seqs.size());
+    for (size_t i = 0; i < seqs.size(); i++) {
+        ans.push_back(seqs);
+    }
+    return ans;
 }
 
 // ***********************************

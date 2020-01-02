@@ -348,7 +348,12 @@ void RangeReporting::recursiveReport(uint64_t y,
     if (Yp > y) {
       occs->push_back(pos);
       if (verbose >= 3) {
-        cout << "Pos = " << pos << "found ! " << endl;
+        cout << "Pos = " << pos << " !" << endl;
+        cout << "Occurrence: " << occs << "found ! " << endl;
+        cout << "size of occs: " << occs->size() << endl;
+          for (unsigned i=0; i<occs->size(); i++)
+              std::cout << ' ' << occs->at(i);
+          std::cout << '\n';
         cout << " x = " << x << " y = " << y << ", l = " << l << ", r = " << r << endl;
 
       }

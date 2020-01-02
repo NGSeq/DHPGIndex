@@ -3,7 +3,6 @@ package org.ngseq.panquery
 import java.io._
 import java.net.URI
 import java.nio.ByteBuffer
-import java.util
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
@@ -16,16 +15,15 @@ import scala.util.control.Breaks._
 object DistributedRLZ2AB {
   def getsuf(SA_b: Array[Array[String]], lb: Long) : Long = {
 
-    val sa_len=SA_b(0).length
     val chunk = lb/(SA_b(0).length)
-    var index = lb-chunk*SA_b(0).length //10001-3*2501=2498 2501
-    if(index.toInt >= SA_b(chunk.toInt).length){
+    val index = lb-chunk*SA_b(0).length //10001-3*2501=2498 2501
+    /*if(index.toInt >= SA_b(chunk.toInt).length){
       //10001 3 2498 2501 2498
       //println(lb+" "+chunk+" "+index+" "+sa_len+" "+SA_b(chunk.toInt).length)
       return 0L //TODO:radix is one char shorter than reference? fix..should last point to first or what?
-     }
-    val s = SA_b(chunk.toInt)(index.toInt).toLong
-    s
+     }*/
+    SA_b(chunk.toInt)(index.toInt).toLong
+
   }
 
 
@@ -33,13 +31,12 @@ object DistributedRLZ2AB {
 
     val chunk = lb/ref(0).length
     var index = lb-chunk*ref(0).length
-    if(index.toInt >= ref(chunk.toInt).length){
+    /*if(index.toInt >= ref(chunk.toInt).length){
       //10001 3 2498 2501 2498
       //println(lb+" "+chunk+" "+index+" "+ref(0).length+" "+ref(chunk.toInt).length)
       return 'N'
-    }
-    val r = ref(chunk.toInt)(index.toInt)
-    r
+    }*/
+    ref(chunk.toInt)(index.toInt)
   }
 
   def main(args: Array[String]) {
@@ -48,11 +45,10 @@ object DistributedRLZ2AB {
 
     val refPath = args(0)
     val splitPath = args(1) // number of refsf
-    val numSplits = args(2).toInt // control how many splits we want for the data
-    val radixFile = args(3)
-    val hdfsout = args(4)
-    val hdfsurl = args(5)
-
+    val radixFile = args(2)
+    val hdfsout = args(3)
+    val hdfsurl = args(4)
+    val reflength = args(5).toLong
 
     //val pgrefs = args(3).toInt //
 
@@ -73,84 +69,45 @@ object DistributedRLZ2AB {
     // now hard coded ref
     //val ref = data.take(1)//.slice(10000,150000)
 
-    val fs = FileSystem.get(new Configuration())
-    val pgFileList = new util.ArrayList[String]
+    //TODO:fix this to read real ref length
 
-    val st = fs.listStatus(new Path(splitPath))
-    st.foreach{s=>
-        pgFileList.add(s.getPath.toUri.getRawPath)
-    }
-    val reffile = pgFileList.get(0)
-    val reflength = st(0).getLen
     println("reffile:::::"+refPath)
     println("REFLEN:::::"+reflength)
 
     println("loading to spark")
 
-    val refdata1 = spark.sparkContext.textFile(refPath+"_r1").collect()
-    val refdata2 = spark.sparkContext.textFile(refPath+"_r2").collect()
-    val refdata3 = spark.sparkContext.textFile(refPath+"_r3").collect()
-    val refdata4 = spark.sparkContext.textFile(refPath+"_r4").collect()
+   /* val radixdata1 = scala.io.Source.fromFile(radixFile+"00").getLines.toArray
+    val radixdata2 = scala.io.Source.fromFile(radixFile+"01").getLines.toArray
+    val radixdata3 = scala.io.Source.fromFile(radixFile+"02").getLines.toArray
+    val radixdata4 = scala.io.Source.fromFile(radixFile+"03").getLines.toArray
+    val radixdata5 = scala.io.Source.fromFile(radixFile+"05").getLines.toArray*/
 
 
-    val radixdata1 = spark.sparkContext.textFile(radixFile+"_r1").collect()
-    val radixdata2 = spark.sparkContext.textFile(radixFile+"_r2").collect()
-    val radixdata3 = spark.sparkContext.textFile(radixFile+"_r3").collect()
-    val radixdata4 = spark.sparkContext.textFile(radixFile+"_r4").collect()
+    var i = 0
+    var bcarr = ArrayBuffer(scala.io.Source.fromFile(radixFile+"00").getLines.toArray)
+    for(i <- 1 to 9){
 
-    /*    val client = new DFSClient(URI.create(hdfsurl), new Configuration())
-        var radixstream = client.open(radixFile)
-        val bfr = new BufferedReader(new InputStreamReader(radixstream))
-        var refstream = client.open(reffile)
-        val bfref = new BufferedReader(new InputStreamReader(refstream))
+      bcarr.+=(scala.io.Source.fromFile(radixFile+"0"+i.toString).getLines.toArray)
+    }
+    for(i <- 10 to 39){
+      bcarr.+=(scala.io.Source.fromFile(radixFile+""+i.toString).getLines.toArray)
+    }
 
-        val rflen = (reflength/2).toInt
-        val SA_b1 = new ArrayBuffer[Long]
-        //val SA_b2 = Array.fill(rf)(-1L)
-        var SA_b2 = new ArrayBuffer[Long]
-        var line: String = bfr.readLine()
-
-        var cnt = 0L
-
-        while (line != null) {
-          if(cnt<rflen)
-            SA_b1.append(line.stripLineEnd.toLong)
-          else
-            SA_b2.append(line.stripLineEnd.toLong)
-          cnt+=1
-          line = bfr.readLine()
-        }
-
-        cnt = 0L
-
-        var ref1 =""
-        var ref2 = ""
-
-        var value: Int = bfref.read()
-        while ( {value != -1}) {
-          val c =value.toChar
-
-          if(cnt<rflen)
-            ref1 = ref1+c
-          else
-            ref2 = ref2+c
-          cnt+=1
-          value = bfref.read()
-        }
-    */
+    val refdata1 = spark.sparkContext.textFile(refPath+"00").first()
+    val refdata2 = spark.sparkContext.textFile(refPath+"01").first()
+    val refdata3 = spark.sparkContext.textFile(refPath+"02").first()
+    val refdata4 = spark.sparkContext.textFile(refPath+"03").first()
 
     println("broadcasting")
     val rlen = spark.sparkContext.broadcast(reflength)
+
+    val SAbc = spark.sparkContext.broadcast(bcarr.toArray)
 
     val refbc1 = spark.sparkContext.broadcast(refdata1)
     val refbc2 = spark.sparkContext.broadcast(refdata2)
     val refbc3 = spark.sparkContext.broadcast(refdata3)
     val refbc4 = spark.sparkContext.broadcast(refdata4)
 
-    val SAbc1 = spark.sparkContext.broadcast(radixdata1)
-    val SAbc2 = spark.sparkContext.broadcast(radixdata2)
-    val SAbc3 = spark.sparkContext.broadcast(radixdata3)
-    val SAbc4 = spark.sparkContext.broadcast(radixdata4)
     //val parsedRef = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
     //val SA.value_tmp = Array(9, 4, 8, 6, 2, 3, 7, 5, 1).map(_ - 1).zipWithIndex.sortBy(_._1)
     //val SA.value = HashMap(SA.value_tmp: _*)
@@ -314,8 +271,8 @@ object DistributedRLZ2AB {
 
 
 
-      val SA_b = Array(SAbc1.value,SAbc2.value,SAbc3.value,SAbc4.value)
-      val ref = Array(refbc1.value(0),refbc2.value(0),refbc3.value(0),refbc4.value(0))
+      val SA_b = SAbc.value
+      val ref = Array(refbc1.value,refbc2.value,refbc3.value,refbc4.value)
 
       while (i < split.length) {
         //println(i)
@@ -353,7 +310,7 @@ object DistributedRLZ2AB {
     }*/
 
     val nonParsedRef = spark.read.text(splitPath)
-      .select(org.apache.spark.sql.functions.input_file_name, $"value")
+      .select(org.apache.spark.sql.functions.spark_partition_id(), $"value")
       .as[(String, String)]
       .rdd.map{v=>
       //val groups = v.grouped(x._1._2.length()/numSplits).toArray

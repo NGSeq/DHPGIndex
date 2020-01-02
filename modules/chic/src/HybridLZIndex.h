@@ -95,13 +95,25 @@ class HybridLZIndex {
                 vector<string> kernel_options,
                 ostream& out_stream) const;
 
+  void FindALL(vector<Occurrence> my_occs,
+                char * query_filename,
+                char * mates_filename,
+                 bool single_file_paired,
+                 SecondaryReportType secondary_report,
+                 vector<string> kernel_options,
+                 ostream& out_stream) const;
+
   void Find(vector<uint64_t> * ans, string query) const;
-  void Find(vector<string> *ans, vector<uint64_t> position) const;
+  void Find(vector<string> *ans, vector<uint64_t> position, uint64_t range) const;
   void DetailedSpaceUssage() const;
   uint GetSizeBytes() const;
   void Save() const;
 
- private:
+    void FindPatterns(vector<string> *ans, string query) const;
+
+    void FindPatterns(vector<Occurrence> *ans, string query) const;
+
+private:
 
   void ComputeSize();
   void Build();
@@ -198,7 +210,6 @@ class HybridLZIndex {
   char variables_filename[200];
 
   bool InspectIndex();
-
 
 };
 
