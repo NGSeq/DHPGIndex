@@ -119,7 +119,7 @@ void GetParseEM(char * filename, string lzparse_filename,
   exit(EXIT_FAILURE);
 #else
   string command_parse;
-  command_parse.assign(PROJECT_ROOT);
+  command_parse.assign("/opt/chic");
   command_parse += "/ext/LZ/EM-LZscan-0.2/src/emlz_parser " + string(filename);
   command_parse += " --mem=" + std::to_string(max_memory_MB);
   command_parse += " --output=" + lzparse_filename;
@@ -152,7 +152,7 @@ void GetParseRLZ(char * filename,
   exit(EXIT_FAILURE);
 #else
   string command_parse;
-  command_parse.assign(PROJECT_ROOT);
+  command_parse.assign("/opt/chic");
   command_parse += "/ext/LZ/RLZ_parallel/src/rlz_parser.sh " + string(filename) + " " + lzparse_filename;
   command_parse += " " + std::to_string(rlz_ref_len_MB);
   command_parse += " " + std::to_string(n_chunks);

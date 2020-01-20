@@ -27,6 +27,7 @@ KernelManagerFMI::KernelManagerFMI(uchar * text,
     cout << "++++++++++++++++++++++++++++" << endl;
   }
   SetFileNames(_kernel_text_filename);
+  //TODO: Separate this
   CreateKernelTextFile(text, len);
   my_size_in_bytes = 0;
   construct(index, kernel_text_filename.c_str(), 1);
@@ -34,6 +35,25 @@ KernelManagerFMI::KernelManagerFMI(uchar * text,
   kernel_text_len = index.size() - 1;
   //Utils::DeleteTmpFile(kernel_text_filename);
   ComputeSize();
+}
+
+KernelManagerFMI::KernelManagerFMI(char * _kernel_text_filename,
+                                   int _verbose) {
+    verbose = _verbose;
+    if (verbose >=2) {
+        cout << "++++++++++++++++++++++++++++" << endl;
+        cout << "Building FMI Kernel Manager " << endl;
+        cout << "++++++++++++++++++++++++++++" << endl;
+    }
+    SetFileNames(_kernel_text_filename);
+    //TODO: Separate this
+
+    my_size_in_bytes = 0;
+    construct(index, kernel_text_filename.c_str(), 1);
+    my_size_in_bytes += sdsl::size_in_bytes(index);
+    kernel_text_len = index.size() - 1;
+    //Utils::DeleteTmpFile(kernel_text_filename);
+    ComputeSize();
 }
 
 void KernelManagerFMI::CreateKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len) {

@@ -9,6 +9,8 @@
 #include "./utils.h"
 #include "./LempelZivParser.h"
 #include "../ext/LZ/LZscan/algorithm/lzscan.h"
+#include "/usr/hdp/3.1.0.0-78/usr/include/hdfs.h"
+
 
 // INDEX CONSTRUCTION:
 void HybridLZIndex::ValidateParams(BuildParameters * parameters) {
@@ -73,7 +75,18 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
   this->index_prefix = parameters->output_filename;
   SetFileNames();
 
-  Build();
+  if(parameters->kernelizeonly==1){
+      this->hdfs_path = parameters->hdfs_path;
+      InitKernelizeonly();
+  }else{
+      if(parameters->indexingonly==1)
+          Indexing();
+      else{
+          Build();
+      }
+  }
+
+
 }
 
 void HybridLZIndex::Build() {
@@ -103,6 +116,173 @@ void HybridLZIndex::Build() {
   if (verbose >= 2) {
     DetailedSpaceUssage();
   }
+}
+
+void HybridLZIndex::Indexing() {
+    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+        special_separator = (uchar)'N';
+    } else {
+        if (lz_method == LZMethod::IN_MEMORY) {
+            ChooseSpecialSeparator(tmp_seq);
+        } else {
+            ChooseSpecialSeparator(text_filename);
+        }
+    }
+
+    vector<pair<uint64_t, uint64_t> > lz_phrases;
+    LempelZivParser::GetLZPhrases(&lz_phrases, this);
+    n_phrases = lz_phrases.size();
+    tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
+    tsrr->SetFileNames(index_prefix);
+    if (verbose >= 2)
+        cout << "Previous merge: " << n_phrases << " phrases." << endl;
+    n_phrases = lz_phrases.size();
+    if (verbose >= 2)
+        cout << "After merge: " << n_phrases << " phrases." << endl;
+    index_size_in_bytes += tsrr->GetSizeBytes();
+    IndexKernel();
+    ComputeSize();
+    if (verbose >= 2) {
+        DetailedSpaceUssage();
+    }
+}
+
+void HybridLZIndex::InitKernelizeonly(){
+    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+        special_separator = (uchar)'N';
+    } else {
+        if (lz_method == LZMethod::IN_MEMORY) {
+            ChooseSpecialSeparator(tmp_seq);
+        } else {
+            ChooseSpecialSeparator(text_filename);
+        }
+    }
+
+    vector<pair<uint64_t, uint64_t> > lz_phrases;
+    LempelZivParser::GetLZPhrases(&lz_phrases, this);
+    n_phrases = lz_phrases.size();
+    tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
+    tsrr->SetFileNames(index_prefix);
+    if (verbose >= 2)
+        cout << "Previous merge: " << n_phrases << " phrases." << endl;
+    n_phrases = lz_phrases.size();
+    if (verbose >= 2)
+        cout << "After merge: " << n_phrases << " phrases." << endl;
+    index_size_in_bytes += tsrr->GetSizeBytes();
+    Kernelizeonly();
+    ComputeSize();
+    if (verbose >= 2) {
+        DetailedSpaceUssage();
+    }
+}
+
+void HybridLZIndex::Kernelizeonly() {
+    ComputeKernelTextLen();
+    if (verbose) {
+        cout << "+++++++++++++++++Kernelizeonly++++++++++++++++++++++++++++" << endl;
+        cout << "Original length n    : " << text_len << endl;
+        cout << "Kernel text length n : " << kernel_text_len << endl;
+        cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+    }
+
+    uint64_t *tmp_limits_kernel;
+    uchar *kernel_text;
+
+    long t1 = Utils::wclock();
+    MyBuffer * my_buffer;
+    /*if (lz_method == LZMethod::IN_MEMORY) {
+        my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
+    } else {
+        //if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+        if (Utils::IsBioKernel(kernel_type)) {
+            my_buffer = new MyBufferFastaFile(text_filename);
+        } else {
+            my_buffer = new MyBufferHDFS(text_filename);
+        }
+    }*/
+    my_buffer = new MyBufferHDFS(this->hdfs_path);
+
+    MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
+    long t2 = Utils::wclock();
+    cout << "MakeKernelString from HDFS: "<< (t2-t1) << " seconds. " << endl;
+
+    delete(my_buffer);
+
+    long k1 = Utils::wclock();
+    if (kernel_type == KernelType::FMI) {
+        this->WriteToHDFS(kernel_text);
+    } else if (kernel_type == KernelType::BWA) {
+        this->WriteToHDFS(kernel_text);
+    } else if (kernel_type == KernelType::BOWTIE2) {
+        this->WriteToHDFS(kernel_text);
+    } else {
+        cerr << "Unknown kernel type given" << endl;
+        exit(EXIT_FAILURE);
+    }
+    long k2 = Utils::wclock();
+    cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
+
+    //delete [] kernel_text;
+
+    //EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
+    //store_to_file(limits_kernel, limits_kernel_filename);
+    //store_to_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
+
+    //delete [] tmp_limits_kernel;
+
+    //index_size_in_bytes += kernel_manager->GetSizeBytes();
+    // ASSERT(kernel_text_len == kernel_manager->GetLength());
+}
+
+void HybridLZIndex::WriteKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len) {
+    FILE * fp = Utils::OpenWriteOrDie(kernel_manager_prefix);
+    if (_kernel_text_len != fwrite(_kernel_text, 1, _kernel_text_len, fp)) {
+        cout << "Error writing the kernel to a file" << endl;
+        exit(1);
+    }
+    fclose(fp);
+}
+
+void HybridLZIndex::IndexKernel() {
+    ComputeKernelTextLen();
+    if (verbose) {
+        cout << "+++++++++++++++++++INDEXING ONLY++++++++++++++++++++++++++" << endl;
+        cout << "Original length n    : " << text_len << endl;
+        cout << "Kernel text length n : " << kernel_text_len << endl;
+        cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+    }
+
+
+    long t1 = Utils::wclock();
+
+
+
+    long k1 = Utils::wclock();
+    if (kernel_type == KernelType::FMI) {
+        kernel_manager = new KernelManagerFMI(kernel_manager_prefix,
+                                              verbose);
+    } else if (kernel_type == KernelType::BWA) {
+        kernel_manager = new KernelManagerBWA(kernel_manager_prefix,
+                                              verbose);
+    } else if (kernel_type == KernelType::BOWTIE2) {
+        kernel_manager = new KernelManagerBowTie2(kernel_manager_prefix,
+                                                  verbose);
+    } else {
+        cerr << "Unknown kernel type given" << endl;
+        exit(EXIT_FAILURE);
+    }
+    long t2 = Utils::wclock();
+    cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
+
+    // delete [] kernel_text;
+    //EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
+    //load_from_file(limits_kernel, limits_kernel_filename);
+    //load_from_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
+
+    //delete [] tmp_limits_kernel;
+
+    index_size_in_bytes += kernel_manager->GetSizeBytes();
+    // ASSERT(kernel_text_len == kernel_manager->GetLength());
 }
 
 void HybridLZIndex::Kernelize() {
@@ -160,7 +340,7 @@ void HybridLZIndex::Kernelize() {
   long k2 = Utils::wclock();
   cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
 
-    delete [] kernel_text;
+   // delete [] kernel_text;
 
   EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
   delete [] tmp_limits_kernel;
@@ -191,7 +371,7 @@ void HybridLZIndex::MakeKernelString(MyBuffer * is,
       if (right-left < 2*context_len+2 || tsrr->IsLiteral(i)) {
         is->SetPos(left);
         for (size_t j =left; j < right; j++, posFil++) {
-          kernel_text[posFil] = is->GetChar();;
+          kernel_text[posFil] = is->GetChar();
         }
       } else {
         // copy M symbol + '$' + M symbols...
@@ -315,6 +495,8 @@ void HybridLZIndex::SetFileNames() {
           REGULAR_DENS);
 }
 
+
+//TODO: do this from HDFS
 void HybridLZIndex::ChooseSpecialSeparator(char * filename) {
   FILE * fp = Utils::OpenReadOrDie(filename);
 
@@ -439,7 +621,33 @@ void HybridLZIndex::SetSpecialSeparator(uint64_t * alpha_test_tmp) {
   }
 }
 
-void HybridLZIndex::Save() const {
+void HybridLZIndex::WriteToHDFS(uchar * text) {
+
+
+    std::string p("/user/root/index/");
+    string s = kernel_manager_prefix;
+    std::size_t found = s.find_last_of("/\\");
+    p += s.substr(found+1);
+    const char *writePath = p.c_str();
+
+    fs = hdfsConnect("node-1", 8020);
+    hdfsFile hfile = hdfsOpenFile(fs, writePath, O_WRONLY|O_CREAT, 0, 0, 0);
+    cout << writePath << endl;
+    if(!hfile) {
+        fprintf(stderr, "Failed to open %s for writing!\n", writePath);
+    }
+
+    char* buffer = reinterpret_cast<char*>(text);
+    tSize num_written_bytes = hdfsWrite(fs, hfile, (void*)buffer, strlen(buffer)+1);
+
+    if (hdfsFlush(fs, hfile)) {
+        fprintf(stderr, "Failed to 'flush' %s\n", writePath);
+        exit(-1);
+    }
+    hdfsCloseFile(fs, hfile);
+}
+
+/*void HybridLZIndex::SaveToHDFS() const {
   FILE * fp = Utils::OpenWriteOrDie(variables_filename);
   if (1 != fwrite(&text_len, sizeof(text_len), 1, fp)) {
     cerr << "Error writing the variables" << endl;
@@ -482,6 +690,52 @@ void HybridLZIndex::Save() const {
   if (verbose) {
     cout << "Saving is ready" << endl;
   }
+}
+*/
+
+void HybridLZIndex::Save() const {
+    FILE * fp = Utils::OpenWriteOrDie(variables_filename);
+    if (1 != fwrite(&text_len, sizeof(text_len), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    if (1 != fwrite(&special_separator, sizeof(special_separator), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    if (1 != fwrite(&max_query_len, sizeof(max_query_len), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    if (1 != fwrite(&max_insertions, sizeof(max_insertions), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    if (1 != fwrite(&sparse_sample_ratio, sizeof(sparse_sample_ratio), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    if (1 != fwrite(&kernel_type, sizeof(kernel_type), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    if (1 != fwrite(&kernel_text_len, sizeof(kernel_text_len), 1, fp)) {
+        cerr << "Error writing the variables" << endl;
+        exit(1);
+    }
+    fclose(fp);
+
+    store_to_file(limits_kernel, limits_kernel_filename);
+    store_to_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
+
+    tsrr->Save();
+    kernel_manager->Save();
+    book_keeper->SetFileNames(index_prefix);
+    book_keeper->Save();
+
+    if (verbose) {
+        cout << "Saving is ready" << endl;
+    }
 }
 
 void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {

@@ -12,6 +12,44 @@
 KernelManagerBWA::KernelManagerBWA() {
 }
 
+KernelManagerBWA::KernelManagerBWA(char * _kernel_text_filename,
+                                   int _verbose) {
+    verbose = _verbose;
+    if (verbose >=2) {
+        cout << "++++++++++++++++++++++++++++" << endl;
+        cout << "Building BWA Kernel Manager " << endl;
+        cout << "++++++++++++++++++++++++++++" << endl;
+    }
+    SetFileNames(_kernel_text_filename);
+
+    my_size_in_bytes = 0;
+    size_t kernel_text_len = this->ComputeLength();
+#ifndef PROJECT_ROOT
+    cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
+    exit(-1);
+#else
+    char * command_bwa_index= new char[1024];
+  sprintf(command_bwa_index,
+          "bwa index %s >%s.log_bwaindex 2>&1",
+          kernel_text_filename.c_str(),
+          kernel_text_filename.c_str());
+  if (verbose > 1) {
+  cout << "-------------------------------------" << endl;
+  cout << "To index the Kenrel, We wil call:" << endl;
+  cout <<  command_bwa_index << endl ;
+  cout << "-------------------------------------" << endl;
+  }
+  if (system(command_bwa_index)) {
+    cout << "Command failed. " << endl;
+    exit(-1);
+  }
+  delete[] command_bwa_index;
+#endif
+
+    //Utils::DeleteTmpFile(kernel_text_filename);
+    ComputeSize();
+}
+
 KernelManagerBWA::KernelManagerBWA(uchar * input_kernel_text,
                                    size_t input_len,
                                    char * _kernel_text_filename,
@@ -98,7 +136,7 @@ vector<Occurrence>  KernelManagerBWA::LocateOccsFQ(char * query_filename,
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
   exit(-1);
 #else
-  string  tmp_out_filename = "./.reads_aligned_to_kernel.sam";  // TODO: a better name ?
+  string  tmp_out_filename = "/mnt/.reads_aligned_to_kernel.sam";  // TODO: a better name ?
   string command_bwa_mem = "";
   string all_flags;
   if (retrieve_all) {

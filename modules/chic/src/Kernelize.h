@@ -10,7 +10,6 @@
 #include "MyBufferPlainFile.hpp"
 #include "MyBufferMemSeq.hpp"
 #include "MyBufferFastaFile.hpp"
-#include "MyBufferHDFS.hpp"
 #include <streambuf>
 #include <ostream>
 #include <sdsl/util.hpp>
@@ -19,8 +18,6 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/rank_support.hpp>
 #include <sdsl/select_support.hpp>
-#include "/usr/hdp/3.1.0.0-78/usr/include/hdfs.h"
-
 
 using std::ostream;
 
@@ -82,8 +79,6 @@ class HybridLZIndex {
     return rlz_ref_len_MB; 
   }
   void ValidateParams(BuildParameters * params);
-  void WriteKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len);
-  void WriteToHDFS(uchar * text);
   /////////////////////
   // INDEX QUERIES
 /////////////////////
@@ -125,11 +120,6 @@ private:
   void SetFileNames();
   void GetLZPhrases(vector<pair<uint64_t, uint>> * lz_phrases_ptr);
   void Kernelize();
-  void InitKernelizeonly();
-  void Kernelizeonly();
-  void IndexingOnly();
-  void IndexKernel();
-  void Indexing();
   void MakeKernelString(MyBuffer *is, uchar ** kernel_ans, uint64_t ** tmp_limits_kernel_ans);
   void EncodeKernelLimitsAndSuccessor(uint64_t * tmp_limits_kernel);
 
@@ -139,28 +129,6 @@ private:
   void SetSpecialSeparator(uint64_t * alpha_test_tmp);
   void ComputeKernelTextLen();
 
-  // Find:
-  void FindPrimaryOccs(vector<Occurrence> * ans, string query) const;
-  void searchSecondaryOcc(vector<Occurrence> * ans, uint *nSec = NULL) const;
-
-  void FindPrimaryOccsFQ(vector<Occurrence> * ans,
-                         vector<Occurrence> * unmapped,
-                         SecondaryReportType secondary_report,
-                         char * query_filename,
-                         char * mates_filename,
-                         bool single_file_paired,
-                         vector<string> kernel_options) const;
-  void FindPrimaryOccsFQ2(vector<Occurrence> * ans,
-                           vector<Occurrence> * unmapped,
-                           SecondaryReportType secondary_report,
-                           char * alignment_filename,
-                           bool single_file_paired,
-                           vector<string> kernel_options) const;
-
-  void CreateSamRecordsForTrulyLostAlignments(vector<Occurrence> * lost_occs,
-                                              vector<Occurrence> * unmapped,
-                                              vector<Occurrence> * ans,
-                                              bool retrieve_all) const;
 
   uint64_t MapKernelPosToTextPos(uint64_t pos, uint64_t * next_limit_pos, uint * predecessor_i) const;
   uint SuccessorInKernelLimits(uint64_t x, uint64_t * val) const;
@@ -208,7 +176,6 @@ private:
   uchar * tmp_seq;  // ptr to seq, in case it was provided.
 
   char * text_filename;
-  char * hdfs_path;
   char * index_prefix;
   char * input_lz_filename;
   // intermediate files for index construction
@@ -221,7 +188,6 @@ private:
   char variables_filename[200];
 
   bool InspectIndex();
-hdfsFS fs;
 
 };
 

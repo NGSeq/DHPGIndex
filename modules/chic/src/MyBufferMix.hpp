@@ -10,12 +10,16 @@
 class MyBufferMix : public MyBuffer{
   public:
     MyBufferMix(char * filename) {
-      fs.open(filename);
+        fprintf(stdout, " MIX");
+
+        fs.open(filename);
       ASSERT(fs.good());
       seq = NULL;
     }
     MyBufferMix(uchar * _seq, size_t _len) {
-      seq = _seq;
+        fprintf(stdout, " MIX");
+
+        seq = _seq;
       len = _len;
       i = 0;
     }

@@ -49,6 +49,9 @@ typedef struct {
   uint max_edit_distance;
   KernelType kernel_type;
   int verbose;
+  int kernelizeonly;
+  int indexingonly;
+  char * hdfs_path;
 } BuildParameters;
 
 namespace Utils {

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include "./HybridLZIndex.h"
+#include "./Kernelize.h"
 
 void suggest_help();
 void suggest_help(char ** argv) {
@@ -52,8 +53,6 @@ int main(int argc, char **argv) {
       /* These options don’t set a flag.
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
-      {"kernelize",    required_argument, 0, 'Z'},
-      {"hdfspath",    required_argument, 0, 'H'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
       {"lz-input-file",    required_argument, 0, 'F'},
       {"max-edit-distance",    required_argument, 0, 'k'},
@@ -68,7 +67,7 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:M:F:k:o:v:m:r:t:h:Z:H", long_options, &option_index);
+    int c = getopt_long(argc, argv, "K:M:F:k:o:v:m:r:t:h", long_options, &option_index);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -102,10 +101,6 @@ int main(int argc, char **argv) {
         }
         break;
 
-        case 'Z':
-            parameters->kernelizeonly = 1;
-            break;
-
       case 'M':
         ASSERT(parameters->input_lz_filename == NULL);
         if (strcmp(optarg, "IM") == 0) {
@@ -120,10 +115,6 @@ int main(int argc, char **argv) {
           exit(0);
         }
         break;
-
-        case 'H':
-            parameters->hdfs_path = optarg;
-            break;
       
       case 'F':
         parameters->input_lz_filename = optarg;
@@ -195,9 +186,11 @@ int main(int argc, char **argv) {
 
   t1 = Utils::wclock();
   //TODO: separate kernelize and indexing, apply kernelization to spark drlz code (kernel per chr)
+  Kernelize * kernel = new Kernelize(parameters);
 
-  HybridLZIndex * index = new HybridLZIndex(parameters);
-  index->Save();
+  //HybridLZIndex * index = new HybridLZIndex(parameters);
+
+  kernel->Save();
   t2 = Utils::wclock();
 
   cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;

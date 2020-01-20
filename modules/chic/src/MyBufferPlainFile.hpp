@@ -10,10 +10,12 @@
 class MyBufferPlainFile : public MyBuffer{
  public:
   MyBufferPlainFile(char * filename) {
+      fprintf(stdout, " PLAINFILE");
     fs.open(filename);
     ASSERT(fs.good());
   }
   void SetPos(size_t j) {
+      //cout << j << " ";
     fs.seekg((int64_t)j);
   }
   inline uchar GetChar() {
@@ -21,7 +23,9 @@ class MyBufferPlainFile : public MyBuffer{
       cout << "A PROBLEM OCCURRED WITH FS!! " << endl;
       exit(EXIT_FAILURE);
     }
-    return  fs.get();
+      uchar c = fs.get();
+      //fprintf(stdout, " %c ", c);
+    return  c;
   }
   virtual ~MyBufferPlainFile() {
   }

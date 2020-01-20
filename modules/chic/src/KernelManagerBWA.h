@@ -32,6 +32,8 @@ class KernelManagerBWA : public KernelManager {
  public:
   // Index construction:
   KernelManagerBWA();
+    KernelManagerBWA(char * _kernel_text_filename,
+                     int _verbose);
   KernelManagerBWA(uchar * text,
                    size_t text_len,
                    char * _kernel_text_filename,

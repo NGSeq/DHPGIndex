@@ -13,7 +13,9 @@ using FMD::FastaMetaData;
 class MyBufferFastaFile : public MyBuffer{
  public:
   MyBufferFastaFile(char * filename) {
-    metadata = new FastaMetaData();
+      fprintf(stdout, " FASTA");
+
+      metadata = new FastaMetaData();
     metadata->Load(string(filename)+".metadata");
     line_len = metadata->GetLineLength();
     fs.open(filename);

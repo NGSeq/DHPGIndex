@@ -887,6 +887,7 @@ add_executable(chic
     src/MyBufferFastaFile.hpp
     src/MyBufferMemSeq.hpp
     src/MyBufferMix.hpp
+        src/MyBufferHDFS.hpp
     src/MyBufferPlainFile.hpp
     src/occurrence.h
     src/RangeReporting.cpp

@@ -35,6 +35,8 @@ class KernelManagerFMI : public KernelManager {
   KernelManagerFMI(uchar * text,
                    size_t text_len,char * _kernel_text_filename,
                    int _verbose);
+  KernelManagerFMI(char * _kernel_text_filename,
+                     int _verbose);
   void CreateKernelTextFile(uchar * kernel_text, size_t kernel_text_len);
   void DeleteKernelTextFile();
   void ComputeSize();

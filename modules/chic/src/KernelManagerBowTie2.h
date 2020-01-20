@@ -33,6 +33,8 @@ class KernelManagerBowTie2 : public KernelManager {
  public:
   // Index construction:
   KernelManagerBowTie2();
+    KernelManagerBowTie2(char * _kernel_text_filename,
+                     int _verbose);
   KernelManagerBowTie2(uchar * text,
                    size_t text_len,
                    char * _kernel_text_filename,

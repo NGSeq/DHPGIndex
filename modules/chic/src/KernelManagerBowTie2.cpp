@@ -32,8 +32,8 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
   exit(-1);
 #else
   //string bt2_command_index = string(PROJECT_ROOT);
-  string bt2_command_index = "";
-  bt2_command_index += "bowtie2-build --threads "+std::to_string(n_threads);
+  string bt2_command_index = "/opt/bowtie2/";
+  bt2_command_index += "bowtie2-build --threads 40 ";
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
@@ -51,6 +51,46 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
 
   //Utils::DeleteTmpFile(kernel_text_filename);
   ComputeSize();
+}
+
+KernelManagerBowTie2::KernelManagerBowTie2(
+                                           char * _kernel_text_filename,
+                                           int _verbose) {
+    verbose = _verbose;
+    if (verbose >=2) {
+        cout << "++++++++++++++++++++++++++++" << endl;
+        cout << "Building BowTie2 Kernel Manager " << endl;
+        cout << "++++++++++++++++++++++++++++" << endl;
+    }
+    SetFileNames(_kernel_text_filename);
+    my_size_in_bytes = 0;
+    size_t kernel_text_len = this->ComputeLength();
+
+#ifndef PROJECT_ROOT
+    cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
+    exit(-1);
+#else
+    //string bt2_command_index = string(PROJECT_ROOT);
+    cout << std::to_string(n_threads) << endl;
+  std::string bt2_command_index = "/opt/bowtie2/";
+  bt2_command_index += "bowtie2-build --threads 40 ";
+  bt2_command_index += " " + kernel_text_filename;
+  bt2_command_index += " " + kernel_text_filename;
+  bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
+
+  if (verbose > 1) {
+    cout << "-------------------------------------" << endl;
+    cout << "To index the Kenrel, We wil call: " << endl << bt2_command_index << endl << endl;
+    cout << "-------------------------------------" << endl;
+  }
+  if (system(bt2_command_index.c_str())) {
+    cout << "Command failed. " << endl;
+    exit(-1);
+  }
+#endif
+
+    //Utils::DeleteTmpFile(kernel_text_filename);
+    ComputeSize();
 }
 
 void KernelManagerBowTie2::CreateKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len) {
@@ -98,7 +138,7 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
   exit(-1);
 #else
-  string  tmp_out_filename = "./.reads_aligned_to_kernel.sam";  // TODO: a better name ?
+  string  tmp_out_filename = "/mnt/.reads_aligned_to_kernel.sam";  // TODO: a better name ?
   string bt2_command_align;
   string all_flags;
   if (retrieve_all) {
@@ -121,8 +161,8 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
   if (mates_filename == NULL) {
     bt2_command_align += " -U "+ string(query_filename);
   } else {
-    bt2_command_align += " -U "+ string(query_filename);
-    bt2_command_align += " -U "+ string(mates_filename);
+    bt2_command_align += " -1 "+ string(query_filename);
+    bt2_command_align += " -2 "+ string(mates_filename);
     //bt2_command_align += " -1 "+ string(query_filename);
     //bt2_command_align += " -2 "+ string(mates_filename);
   }

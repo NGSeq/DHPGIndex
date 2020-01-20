@@ -50,6 +50,9 @@ int main(int argc, char **argv) {
       /* These options don’t set a flag.
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
+      {"kernelize",    required_argument, 0, 'Z'},
+      {"indexing",    required_argument, 0, 'I'},
+      {"hdfspath",    required_argument, 0, 'H'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
       {"lz-input-file",    required_argument, 0, 'F'},
       {"max-edit-distance",    required_argument, 0, 'k'},
@@ -64,7 +67,7 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:M:F:k:o:v:m:r:t:h", long_options, &option_index);
+    int c = getopt_long(argc, argv, "K:M:F:k:o:v:m:r:t:h:Z:H:I", long_options, &option_index);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -151,6 +154,17 @@ int main(int argc, char **argv) {
         suggest_help(argv);
         exit(-1);
         break;
+
+        case 'Z':
+            parameters->kernelizeonly = 1;
+            break;
+
+        case 'H':
+            parameters->hdfs_path = optarg;
+            break;
+        case 'I':
+            parameters->indexingonly = 1;
+            break;
 
       default:
         suggest_help(argv);

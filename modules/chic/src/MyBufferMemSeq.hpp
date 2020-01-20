@@ -10,6 +10,7 @@
 class MyBufferMemSeq : public MyBuffer{
   public:
     MyBufferMemSeq(uchar * _seq, size_t _len) {
+        fprintf(stdout, " MEMSEQ");
       seq = _seq;
       len = _len;
       i = 0;
@@ -24,6 +25,7 @@ class MyBufferMemSeq : public MyBuffer{
         ASSERT(i < len);
         uchar ans = seq[i];
         i++;
+        //fprintf(stdout, " %c ", ans);
         return ans;
     }
     virtual ~MyBufferMemSeq() {
