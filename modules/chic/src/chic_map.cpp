@@ -114,9 +114,10 @@ int main(int argc, char *argv[]) {
     if (c == -1)
       break;
 
-    switch (c) {
+      switch (c) {
       case 0:
-        /* If this option set a flag, do nothing else now. */
+
+            /* If this option set a flag, do nothing else now. */
         if (long_options[option_index].flag != 0)
           break;
         printf("option %s", long_options[option_index].name);

@@ -268,6 +268,7 @@ add_executable(chic
     ext/LZ/RLZ_parallel/src/dictionary.h
     ext/LZ/RLZ_parallel/src/dictionary_fasta.h
     ext/LZ/RLZ_parallel/src/fastametadata.hpp
+        ext/LZ/RLZ_parallel/src/hdfsmetadata.hpp
     ext/LZ/RLZ_parallel/src/reference_parser.hpp
     ext/LZ/RLZ_parallel/src/rlz_fasta_tools.hpp
     ext/LZ/RLZ_parallel/src/rlz_for_hybrid.cpp
@@ -884,6 +885,7 @@ add_executable(chic
     src/LempelZivParser.h
     src/load_index.cpp
     src/MyBuffer.h
+        src/hdfsmetadata.hpp
     src/MyBufferFastaFile.hpp
     src/MyBufferMemSeq.hpp
     src/MyBufferMix.hpp

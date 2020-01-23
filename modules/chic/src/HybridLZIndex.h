@@ -19,7 +19,7 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/rank_support.hpp>
 #include <sdsl/select_support.hpp>
-#include "/usr/hdp/3.1.0.0-78/usr/include/hdfs.h"
+#include "./jni/hdfs.h"
 
 
 using std::ostream;

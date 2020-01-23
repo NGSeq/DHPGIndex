@@ -6,8 +6,10 @@
 #include "./utils.h"
 #include "./fasta.h"
 #include "../ext/LZ/RLZ_parallel/src/fastametadata.hpp"
+#include "../ext/LZ/RLZ_parallel/src/hdfsmetadata.hpp"
 
 using FMD::FastaMetaData;
+using FMD::HDFSMetaData;
 
 BookKeeper::BookKeeper() {
   n_seqs = 0;
@@ -25,7 +27,7 @@ BookKeeper::BookKeeper(char * input_filename,
     total_length = Utils::GetLength(input_filename);
     // we should do something here. Otherwise, it is irrelevant.
   } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
-    CreateMetaData(input_filename);
+    CreateMetaDataHDFS(input_filename);
   } else {
     cerr << "Don't know how to manage kernel type" << endl;
     exit(EXIT_FAILURE);
@@ -48,6 +50,30 @@ BookKeeper::BookKeeper(char * input_filename,
     cerr << "Unknown kernel type" << endl;
     exit(EXIT_FAILURE);
   }
+}
+
+void BookKeeper::CreateMetaDataHDFS(char * filename) {
+    HDFSMetaData *metadata;
+    metadata = new HDFSMetaData(string(filename));
+    metadata->Save();
+
+    n_seqs = metadata->GetNSeqs();
+
+    seq_lengths.clear();
+    seq_lengths.reserve(n_seqs);
+
+    seq_names.clear();
+    seq_names.reserve(n_seqs);
+
+    vector<size_t> * ptr_lengths = metadata->AccessSeqLengths();
+    vector<string> * ptr_names = metadata->AccessSeqNames();
+    total_length = 0;
+    for(size_t i = 0; i < n_seqs; i++) {
+        seq_names.push_back(ptr_names->at(i));
+        seq_lengths.push_back(ptr_lengths->at(i));
+        total_length += seq_lengths[i];
+    }
+    delete(metadata);
 }
 
 void BookKeeper::CreateMetaData(char * filename) {

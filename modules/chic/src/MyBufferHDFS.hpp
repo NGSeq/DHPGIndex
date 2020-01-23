@@ -7,9 +7,7 @@
 
 
 #include "MyBuffer.h"
-#include "/usr/hdp/3.1.0.0-78/usr/include/hdfs.h"
-
-
+#include "./jni/hdfs.h"
 
 
 class MyBufferHDFS : public MyBuffer{
@@ -17,14 +15,12 @@ class MyBufferHDFS : public MyBuffer{
   MyBufferHDFS(char * filename) {
 
       fs = hdfsConnect("node-1", 8020);
-      cout << "HERE" << endl;
       hfile = hdfsOpenFile(fs, filename, O_RDONLY |O_CREAT, 0, 0, 0);
-      cout << "HERE2" << endl;
       if(!hfile) {
           cout << "HERE3" << endl;
           fprintf(stderr, "Failed to open %s for writing!\n", filename);
       }
-
+      fprintf(stderr, "Opened  HDSF file %s for reading!\n", filename);
       /*char* buffer = "Hello, World!";
       tSize num_written_bytes = hdfsWrite(fs, writeFile, (void*)buffer, strlen(buffer)+1);
       if (hdfsFlush(fs, writeFile)) {

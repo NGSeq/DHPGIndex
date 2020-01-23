@@ -15,6 +15,7 @@
 
 #include "dictionary_fasta.h"
 #include "fastametadata.hpp"
+#include "hdfsmetadata.hpp"
 #include "common.h"
 #include "reference_parser.hpp"
 
@@ -26,6 +27,7 @@ using std::vector;
 using std::pair;
 using std::string;
 using FMD::FastaMetaData;
+using FMD::HDFSMetaData;
 
 namespace RLZFasta{
   size_t flush_phrases(vector<vector<Factor>> factor_lists, Writer &w) {

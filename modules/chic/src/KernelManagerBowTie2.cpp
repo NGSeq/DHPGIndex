@@ -138,7 +138,7 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
   exit(-1);
 #else
-  string  tmp_out_filename = "/mnt/.reads_aligned_to_kernel.sam";  // TODO: a better name ?
+  string  tmp_out_filename = "/mnt/tmp/reads_aligned_to_kernel.sam";  // TODO: a better name ?
   string bt2_command_align;
   string all_flags;
   if (retrieve_all) {

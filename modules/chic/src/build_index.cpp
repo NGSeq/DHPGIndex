@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:M:F:k:o:v:m:r:t:h:Z:H:I", long_options, &option_index);
+    int c = getopt_long(argc, argv, "K:Z:I:H:M:F:k:o:v:m:r:t:h", long_options, &option_index);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -97,6 +97,15 @@ int main(int argc, char **argv) {
           exit(0);
         }
         break;
+        case 'Z':
+            parameters->kernelizeonly = 1;
+            break;
+        case 'I':
+            parameters->indexingonly = 1;
+            break;
+        case 'H':
+            parameters->hdfs_path = optarg;
+            break;
 
       case 'M':
         ASSERT(parameters->input_lz_filename == NULL);
@@ -154,17 +163,6 @@ int main(int argc, char **argv) {
         suggest_help(argv);
         exit(-1);
         break;
-
-        case 'Z':
-            parameters->kernelizeonly = 1;
-            break;
-
-        case 'H':
-            parameters->hdfs_path = optarg;
-            break;
-        case 'I':
-            parameters->indexingonly = 1;
-            break;
 
       default:
         suggest_help(argv);

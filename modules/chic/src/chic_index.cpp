@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
       {"kernelize",    required_argument, 0, 'Z'},
+      {"indexing",    required_argument, 0, 'I'},
       {"hdfspath",    required_argument, 0, 'H'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
       {"lz-input-file",    required_argument, 0, 'F'},
@@ -68,7 +69,8 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:M:F:k:o:v:m:r:t:h:Z:H", long_options, &option_index);
+    int c = getopt_long(argc, argv, "K:Z:I:H:M:F:k:o:v:m:r:t:h", long_options, &option_index);
+      printf(" with arg %s", optarg);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -106,6 +108,14 @@ int main(int argc, char **argv) {
             parameters->kernelizeonly = 1;
             break;
 
+        case 'I':
+            parameters->indexingonly = 1;
+            break;
+
+        case 'H':
+            parameters->hdfs_path = optarg;
+            break;
+
       case 'M':
         ASSERT(parameters->input_lz_filename == NULL);
         if (strcmp(optarg, "IM") == 0) {
@@ -120,10 +130,6 @@ int main(int argc, char **argv) {
           exit(0);
         }
         break;
-
-        case 'H':
-            parameters->hdfs_path = optarg;
-            break;
       
       case 'F':
         parameters->input_lz_filename = optarg;
@@ -195,7 +201,7 @@ int main(int argc, char **argv) {
 
   t1 = Utils::wclock();
   //TODO: separate kernelize and indexing, apply kernelization to spark drlz code (kernel per chr)
-
+    cout << "hdfspath: " << parameters->hdfs_path << endl;
   HybridLZIndex * index = new HybridLZIndex(parameters);
   index->Save();
   t2 = Utils::wclock();

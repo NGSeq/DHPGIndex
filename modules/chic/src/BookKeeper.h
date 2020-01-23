@@ -16,7 +16,8 @@ class BookKeeper {
     void ReadFasta(char * filename, uchar ** seq_ans, size_t * seq_len_ans);
     void FilterFasta(char * input_filename);
     void CreateMetaData(char * filename);
-    
+    void CreateMetaDataHDFS(char * filename);
+
     virtual ~BookKeeper();
 
     void SetFileNames(char * index_prefix);

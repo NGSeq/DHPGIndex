@@ -9,7 +9,7 @@
 #include "./utils.h"
 #include "./LempelZivParser.h"
 #include "../ext/LZ/LZscan/algorithm/lzscan.h"
-#include "/usr/hdp/3.1.0.0-78/usr/include/hdfs.h"
+#include "./jni/hdfs.h"
 
 
 // INDEX CONSTRUCTION:
@@ -74,10 +74,14 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
 
   this->index_prefix = parameters->output_filename;
   SetFileNames();
-
+    this->hdfs_path = parameters->hdfs_path;
   if(parameters->kernelizeonly==1){
       this->hdfs_path = parameters->hdfs_path;
-      InitKernelizeonly();
+      if(parameters->indexingonly==1)
+          Build();
+      else
+          InitKernelizeonly();
+
   }else{
       if(parameters->indexingonly==1)
           Indexing();
@@ -200,7 +204,7 @@ void HybridLZIndex::Kernelizeonly() {
             my_buffer = new MyBufferHDFS(text_filename);
         }
     }*/
-    my_buffer = new MyBufferHDFS(this->hdfs_path);
+    my_buffer = new MyBufferHDFS(hdfs_path);
 
     MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
     long t2 = Utils::wclock();
@@ -210,11 +214,12 @@ void HybridLZIndex::Kernelizeonly() {
 
     long k1 = Utils::wclock();
     if (kernel_type == KernelType::FMI) {
-        this->WriteToHDFS(kernel_text);
+        //this->WriteToHDFS(kernel_text);
+        this->WriteKernelTextFile(kernel_text, kernel_text_len);
     } else if (kernel_type == KernelType::BWA) {
-        this->WriteToHDFS(kernel_text);
+        this->WriteKernelTextFile(kernel_text, kernel_text_len);
     } else if (kernel_type == KernelType::BOWTIE2) {
-        this->WriteToHDFS(kernel_text);
+        this->WriteKernelTextFile(kernel_text, kernel_text_len);
     } else {
         cerr << "Unknown kernel type given" << endl;
         exit(EXIT_FAILURE);
@@ -304,7 +309,9 @@ void HybridLZIndex::Kernelize() {
   } else {
     //if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
     if (Utils::IsBioKernel(kernel_type)) {
-      my_buffer = new MyBufferFastaFile(text_filename);
+            if(this->hdfs_path != NULL)
+                my_buffer = new MyBufferHDFS(this->hdfs_path);
+            else my_buffer = new MyBufferFastaFile(text_filename);
     } else {
       my_buffer = new MyBufferPlainFile(text_filename);
     }
@@ -1328,7 +1335,7 @@ uint64_t HybridLZIndex::MapKernelPosToTextPos(uint64_t pos,
   ASSERT(succ > 0);
   *pred = succ-1;
   uint64_t offset = (*_next_limit_pos) - pos;
-    cout << "SUCCessor: "<< succ << endl;
+    //cout << "SUCCessor: "<< succ << endl;
   return GetLimit(succ) - offset;
 }
 
