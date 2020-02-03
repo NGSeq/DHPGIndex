@@ -27,7 +27,8 @@ BookKeeper::BookKeeper(char * input_filename,
     total_length = Utils::GetLength(input_filename);
     // we should do something here. Otherwise, it is irrelevant.
   } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
-    CreateMetaDataHDFS(input_filename);
+    CreateMetaData(input_filename);
+    //CreateMetaDataHDFS(input_filename);
   } else {
     cerr << "Don't know how to manage kernel type" << endl;
     exit(EXIT_FAILURE);
@@ -196,10 +197,7 @@ void BookKeeper::NormalizeOutput(Occurrence& occ) {
   size_t kernel_pos = occ.GetPos();
   size_t offset = 0;
   size_t doc_id;
-    cout << "KPOS" << kernel_pos << endl;
 
-    cout << "SEQQ LEN" << seq_lengths.size() << endl;
-    cout << "nseqs" << n_seqs << endl;
     ASSERT(n_seqs == seq_lengths.size());
   size_t prev = 0;
   for (doc_id = 0; doc_id < seq_lengths.size(); doc_id++) {

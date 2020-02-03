@@ -14,6 +14,7 @@ KernelManagerBowTie2::KernelManagerBowTie2() {
 
 KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
                                            size_t input_len,
+                                           int threads,
                                            char * _kernel_text_filename,
                                            int _verbose) {
   verbose = _verbose;
@@ -32,8 +33,9 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
   exit(-1);
 #else
   //string bt2_command_index = string(PROJECT_ROOT);
+
   string bt2_command_index = "/opt/bowtie2/";
-  bt2_command_index += "bowtie2-build --threads 40 ";
+  bt2_command_index += "bowtie2-build --threads "+std::to_string(threads);
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
@@ -55,6 +57,7 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
 
 KernelManagerBowTie2::KernelManagerBowTie2(
                                            char * _kernel_text_filename,
+                                           int threads,
                                            int _verbose) {
     verbose = _verbose;
     if (verbose >=2) {
@@ -73,7 +76,7 @@ KernelManagerBowTie2::KernelManagerBowTie2(
     //string bt2_command_index = string(PROJECT_ROOT);
     cout << std::to_string(n_threads) << endl;
   std::string bt2_command_index = "/opt/bowtie2/";
-  bt2_command_index += "bowtie2-build --threads 40 ";
+  bt2_command_index += "bowtie2-build --threads "+std::to_string(threads);
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";

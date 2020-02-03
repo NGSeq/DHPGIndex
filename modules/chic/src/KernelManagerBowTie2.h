@@ -34,9 +34,11 @@ class KernelManagerBowTie2 : public KernelManager {
   // Index construction:
   KernelManagerBowTie2();
     KernelManagerBowTie2(char * _kernel_text_filename,
+                     int n_threads,
                      int _verbose);
   KernelManagerBowTie2(uchar * text,
                    size_t text_len,
+                   int n_threads,
                    char * _kernel_text_filename,
                    int _verbose);
   void CreateKernelTextFile(uchar * kernel_text, size_t kernel_text_len);

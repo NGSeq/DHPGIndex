@@ -271,6 +271,7 @@ void HybridLZIndex::IndexKernel() {
                                               verbose);
     } else if (kernel_type == KernelType::BOWTIE2) {
         kernel_manager = new KernelManagerBowTie2(kernel_manager_prefix,
+                                                  n_threads,
                                                   verbose);
     } else {
         cerr << "Unknown kernel type given" << endl;
@@ -338,6 +339,7 @@ void HybridLZIndex::Kernelize() {
   } else if (kernel_type == KernelType::BOWTIE2) {
     kernel_manager = new KernelManagerBowTie2(kernel_text,
                                               kernel_text_len,
+                                              n_threads,
                                               kernel_manager_prefix,
                                               verbose);
   } else {

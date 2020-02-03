@@ -635,7 +635,7 @@ uint64_t HybridLZIndex::MapKernelPosToTextPos(uint64_t pos,
   ASSERT(succ > 0);
   *pred = succ-1;
   uint64_t offset = (*_next_limit_pos) - pos;
-    cout << "SUCCessor: "<< succ << endl;
+    //cout << "SUCCessor: "<< succ << endl;
   return GetLimit(succ) - offset;
 }
 

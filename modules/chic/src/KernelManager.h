@@ -35,9 +35,11 @@ class KernelManager {
   };
   KernelManager(uchar * text,
                 size_t len,
+                int n_threads,
                 char * _kernel_text_filename,
                 int _verbose);
     KernelManager(char * _kernel_text_filename,
+                  int n_threads,
                   int _verbose);
   void CreateKernelTextFile(uchar * kernel_text, size_t kernel_text_len);
   virtual void ComputeSize() = 0;
