@@ -25,7 +25,7 @@ class BookKeeper {
     void Load(char * index_prefix, int _verbose);
     void Save() const;
     char * GetNewFileName();
-    void NormalizeOutput(Occurrence& occ);
+    void NormalizeOutput(Occurrence& occ, KernelType kernelType);
     
     char bk_filename[200];
 

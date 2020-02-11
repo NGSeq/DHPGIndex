@@ -24,7 +24,7 @@
 #define uint unsigned int
 #endif
 
-enum class KernelType { BWA, BOWTIE2, FMI };
+enum class KernelType { BWA, BOWTIE2, BLAST, FMI };
 enum class InputType { PLAIN, FQ };
 enum class SecondaryReportType { ALL, LZ, NONE };
 enum class LZMethod {IN_MEMORY, EXTERNAL_MEMORY, RLZ, INPUT};

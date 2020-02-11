@@ -153,6 +153,11 @@ void HybridLZIndex::Kernelize() {
                                               kernel_text_len,
                                               kernel_manager_prefix,
                                               verbose);
+  } else if (kernel_type == KernelType::BLAST) {
+      kernel_manager = new KernelManagerBLAST(kernel_text,
+                                                kernel_text_len,
+                                                kernel_manager_prefix,
+                                                verbose);
   } else {
     cerr << "Unknown kernel type given" << endl;
     exit(EXIT_FAILURE);
@@ -538,6 +543,8 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
     kernel_manager = new KernelManagerFMI();
   } else if (kernel_type == KernelType::BOWTIE2) {
     kernel_manager = new KernelManagerBowTie2();
+  } else if (kernel_type == KernelType::BLAST) {
+      kernel_manager = new KernelManagerBLAST();
   }
   kernel_manager->Load(kernel_manager_prefix, n_threads, _verbose);
   // ASSERT(kernel_text_len == kernel_manager->GetLength());

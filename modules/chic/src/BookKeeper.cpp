@@ -26,7 +26,7 @@ BookKeeper::BookKeeper(char * input_filename,
     n_seqs = 0;  // TODO: if we want FMI to handle many files
     total_length = Utils::GetLength(input_filename);
     // we should do something here. Otherwise, it is irrelevant.
-  } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+  } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST) {
     CreateMetaData(input_filename);
     //CreateMetaDataHDFS(input_filename);
   } else {
@@ -45,7 +45,7 @@ BookKeeper::BookKeeper(char * input_filename,
   this->verbose = _verbose;
   if (kernel_type == KernelType::FMI) {
     ReadPlain(input_filename, seq_ans, seq_len_ans);
-  } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+  } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST) {
     ReadFasta(input_filename, seq_ans, seq_len_ans);
   } else {
     cerr << "Unknown kernel type" << endl;
@@ -193,7 +193,7 @@ char * BookKeeper::GetNewFileName() {
 }
 */
 
-void BookKeeper::NormalizeOutput(Occurrence& occ) {
+void BookKeeper::NormalizeOutput(Occurrence& occ, KernelType kernelType) {
   size_t kernel_pos = occ.GetPos();
   size_t offset = 0;
   size_t doc_id;
@@ -211,7 +211,9 @@ void BookKeeper::NormalizeOutput(Occurrence& occ) {
   ASSERT(kernel_pos < offset);
   ASSERT(prev <= kernel_pos);
   size_t new_pos = kernel_pos - prev;
-  occ.UpdatePos(new_pos, seq_names[doc_id]);
+  if(kernelType==KernelType::BLAST)
+      occ.UpdatePosBlast(new_pos, seq_names[doc_id]);
+  else occ.UpdatePos(new_pos, seq_names[doc_id]);
 }
 
 void BookKeeper::SetFileNames(char * _prefix) {

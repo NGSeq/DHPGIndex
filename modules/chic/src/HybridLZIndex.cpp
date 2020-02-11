@@ -220,6 +220,8 @@ void HybridLZIndex::Kernelizeonly() {
         this->WriteKernelTextFile(kernel_text, kernel_text_len);
     } else if (kernel_type == KernelType::BOWTIE2) {
         this->WriteKernelTextFile(kernel_text, kernel_text_len);
+    } else if (kernel_type == KernelType::BLAST) {
+        this->WriteKernelTextFile(kernel_text, kernel_text_len);
     } else {
         cerr << "Unknown kernel type given" << endl;
         exit(EXIT_FAILURE);
@@ -271,6 +273,10 @@ void HybridLZIndex::IndexKernel() {
                                               verbose);
     } else if (kernel_type == KernelType::BOWTIE2) {
         kernel_manager = new KernelManagerBowTie2(kernel_manager_prefix,
+                                                  n_threads,
+                                                  verbose);
+    } else if (kernel_type == KernelType::BLAST) {
+        kernel_manager = new KernelManagerBLAST(kernel_manager_prefix,
                                                   n_threads,
                                                   verbose);
     } else {
@@ -342,6 +348,12 @@ void HybridLZIndex::Kernelize() {
                                               n_threads,
                                               kernel_manager_prefix,
                                               verbose);
+  } else if (kernel_type == KernelType::BLAST) {
+      kernel_manager = new KernelManagerBLAST(kernel_text,
+                                                kernel_text_len,
+                                                n_threads,
+                                                kernel_manager_prefix,
+                                                verbose);
   } else {
     cerr << "Unknown kernel type given" << endl;
     exit(EXIT_FAILURE);
@@ -783,6 +795,9 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
     cerr << stderr << "Error reading var from file" << endl;
     exit(1);
   }
+    if(kernel_type==KernelType::BLAST) cout << "Kernel type is BLAST!  " << endl;
+    if(kernel_type==KernelType::BOWTIE2) cout << "Kernel type is BOWTIE!  " << endl;
+    if(kernel_type==KernelType::BWA) cout << "Kernel type is BWA!  " << endl;
   if (1 != fread(&kernel_text_len, sizeof(kernel_text_len), 1, fp)) {
     cerr << stderr << "Error reading var from file" << endl;
     exit(1);
@@ -801,6 +816,8 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
     kernel_manager = new KernelManagerFMI();
   } else if (kernel_type == KernelType::BOWTIE2) {
     kernel_manager = new KernelManagerBowTie2();
+  }else if (kernel_type == KernelType::BLAST) {
+      kernel_manager = new KernelManagerBLAST();
   }
   kernel_manager->Load(kernel_manager_prefix, n_threads, _verbose);
   // ASSERT(kernel_text_len == kernel_manager->GetLength());
@@ -906,13 +923,15 @@ void HybridLZIndex::FindFQ(char * query_filename,
   // TODO:
   // This is the BAM header, probable KernelBWA should take care of this...
   vector<string> header = book_keeper->SamHeader();
+  if(kernel_type!=KernelType::BLAST)
   for (size_t i = 0; i < header.size(); i++) {
-    my_out << header[i] << endl;
+      my_out << header[i] << endl;
   }
   my_out << "@PG\tID:CHIC\tVN:0.1" << endl;
 
   for (size_t i = 0; i < my_occs.size(); i++) {
-    book_keeper->NormalizeOutput(my_occs[i]);
+
+    book_keeper->NormalizeOutput(my_occs[i], kernel_type);
     my_out << my_occs[i].GetMessage() << endl;
   }
   for (size_t i = 0; i < unmapped_occs.size(); i++) {
@@ -948,7 +967,7 @@ void HybridLZIndex::FindFQ2(char * alignment_filename,
   my_out << "@PG\tID:CHIC\tVN:0.1" << endl;
 
   for (size_t i = 0; i < my_occs.size(); i++) {
-    book_keeper->NormalizeOutput(my_occs[i]);
+    book_keeper->NormalizeOutput(my_occs[i], kernel_type);
     my_out << my_occs[i].GetMessage() << endl;
   }
   for (size_t i = 0; i < unmapped_occs.size(); i++) {
@@ -1001,7 +1020,9 @@ void HybridLZIndex::FindALL(vector<Occurrence> my_occs,
 
             if (next_limit_pos <= my_occs[i].GetPos() + my_occs[i].GetLength() - 1 ||
                 tsrr->IsLiteral(prev_limit)) {
-                my_occs[i].UpdatePos(pos_in_text);
+                if(kernel_type==KernelType::BLAST)
+                    my_occs[i].UpdatePosBlast(pos_in_text);
+                else my_occs[i].UpdatePos(pos_in_text);
             } else {
                 lost_occs.push_back(my_occs[i]);
                 if (verbose >= 3) {
@@ -1158,7 +1179,10 @@ void HybridLZIndex::FindPrimaryOccsFQ(vector<Occurrence> * ans,
                                                    & prev_limit);
       if (next_limit_pos <= locations[i].GetPos() + locations[i].GetLength() - 1 ||
           tsrr->IsLiteral(prev_limit)) {
-        locations[i].UpdatePos(pos_in_text);
+          if(kernel_type==KernelType::BLAST)
+              locations[i].UpdatePosBlast(pos_in_text);
+          else
+              locations[i].UpdatePos(pos_in_text);
         ans->push_back(locations[i]);
       } else {
         lost_occs.push_back(locations[i]);
@@ -1219,7 +1243,9 @@ void HybridLZIndex::FindPrimaryOccsFQ2(vector<Occurrence> * ans,
       if (next_limit_pos <= locations[i].GetPos() + locations[i].GetLength() - 1 ||
           tsrr->IsLiteral(prev_limit) ||
           secondary_report != SecondaryReportType::ALL) {
-        locations[i].UpdatePos(pos_in_text);
+          if(kernel_type==KernelType::BLAST)
+              locations[i].UpdatePosBlast(pos_in_text);
+          else locations[i].UpdatePos(pos_in_text);
         ans->push_back(locations[i]);
       } else {
         lost_occs.push_back(locations[i]);
@@ -1320,7 +1346,9 @@ void HybridLZIndex::searchSecondaryOcc(vector<Occurrence> * ans,
       size_t posLim = tsrr->GetPtr(pos);
       size_t real_pos = GetLimit(posLim) + curr_pos - tsrr->GetX(pos);
       ans->push_back(ans->at(i));
-      ans->back().UpdatePos(real_pos, "", (int)256);
+      if(kernel_type==KernelType::BLAST)
+          ans->back().UpdatePosBlast(real_pos, "", (int)256);
+      else ans->back().UpdatePos(real_pos, "", (int)256);
     }
     n_sec += tmp_ans.size();
   }

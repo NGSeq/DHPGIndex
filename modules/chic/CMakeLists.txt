@@ -875,6 +875,8 @@ add_executable(chic
     src/HybridLZIndex.cpp
     src/HybridLZIndex.h
     src/KernelManager.h
+    src/KernelManagerBLAST.cpp
+    src/KernelManagerBLAST.h
     src/KernelManagerBowTie2.cpp
     src/KernelManagerBowTie2.h
     src/KernelManagerBWA.cpp

@@ -91,7 +91,9 @@ int main(int argc, char **argv) {
         if (strcmp(optarg, "BWA") == 0) {
           parameters->kernel_type = KernelType::BWA;;
         } else if (strcmp(optarg, "BOWTIE2") == 0) {
-          parameters->kernel_type = KernelType::BOWTIE2;;
+          parameters->kernel_type = KernelType::BOWTIE2;
+        } else if (strcmp(optarg, "BLAST") == 0) {
+          parameters->kernel_type = KernelType::BLAST;
         } else if (strcmp(optarg, "FMI") == 0) {
           cerr << "CHIC cannot use FMI index" << endl;
           print_help();

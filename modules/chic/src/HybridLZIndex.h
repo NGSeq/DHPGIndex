@@ -4,6 +4,7 @@
 #include "RangeReporting.h"
 #include "KernelManagerBWA.h"
 #include "KernelManagerBowTie2.h"
+#include "KernelManagerBLAST.h"
 #include "KernelManagerFMI.h"
 #include "BookKeeper.h"
 #include "MyBuffer.h"
