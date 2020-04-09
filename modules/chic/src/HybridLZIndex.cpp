@@ -94,7 +94,7 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
 }
 
 void HybridLZIndex::Build() {
-  if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+  if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST ) {
     special_separator = (uchar)'N';
   } else {
     if (lz_method == LZMethod::IN_MEMORY) {
@@ -123,7 +123,7 @@ void HybridLZIndex::Build() {
 }
 
 void HybridLZIndex::Indexing() {
-    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST) {
         special_separator = (uchar)'N';
     } else {
         if (lz_method == LZMethod::IN_MEMORY) {
@@ -152,7 +152,7 @@ void HybridLZIndex::Indexing() {
 }
 
 void HybridLZIndex::InitKernelizeonly(){
-    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2|| kernel_type == KernelType::BLAST) {
         special_separator = (uchar)'N';
     } else {
         if (lz_method == LZMethod::IN_MEMORY) {
@@ -764,7 +764,7 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
   this->sparse_sample_ratio = SPARSE_DENS;
   this->verbose = _verbose;
   this->n_threads = _n_threads;
-  this->index_prefix = _prefix;
+  this->index_prefix = _prefix;f
   this->tmp_seq = NULL;
   SetFileNames();
 
@@ -1177,11 +1177,12 @@ void HybridLZIndex::FindPrimaryOccsFQ(vector<Occurrence> * ans,
       uint64_t pos_in_text = MapKernelPosToTextPos(locations[i].GetPos(),
                                                    &next_limit_pos,
                                                    & prev_limit);
+
       if (next_limit_pos <= locations[i].GetPos() + locations[i].GetLength() - 1 ||
           tsrr->IsLiteral(prev_limit)) {
-          if(kernel_type==KernelType::BLAST)
+          if(kernel_type==KernelType::BLAST){
               locations[i].UpdatePosBlast(pos_in_text);
-          else
+          }else
               locations[i].UpdatePos(pos_in_text);
         ans->push_back(locations[i]);
       } else {

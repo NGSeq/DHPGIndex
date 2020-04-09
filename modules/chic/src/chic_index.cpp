@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
       {"kernelize",    required_argument, 0, 'Z'},
-      {"indexing",    required_argument, 0, 'I'},
+      {"indexing",    required_argument, 0, 'I'}
       {"hdfspath",    required_argument, 0, 'H'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
       {"lz-input-file",    required_argument, 0, 'F'},

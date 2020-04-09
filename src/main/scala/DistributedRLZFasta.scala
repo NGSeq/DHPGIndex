@@ -1,3 +1,5 @@
+package org.ngseq.panquery
+
 import java.io._
 import java.net.URI
 import java.nio.ByteBuffer
@@ -8,82 +10,128 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable.ArrayBuffer
+import scala.sys.process.Process
 import scala.util.control.Breaks._
 
-object DistributedRLZGaps {
+object DistributedRLZFasta {
 
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
-    import spark.implicits._
 
-    val localradix = args(0)
-    val localref = args(1)
-
-    val dataPath = args(2)
-    val hdfsurl = args(3)
-    val hdfsout = args(4)
-    val hdfsgapless = args(5)
+    val chr = args(0)
+    val dataPath = args(1)
+    val hdfsurl = args(2)
+    val hdfsout = args(3)
+    val refsize = args(4).toInt
 
     val radixSA = "./radixSA"
-
-    val localOut = "radixout.txt"
+    val localOut = "radixout."+chr
     val refParse = "./rlz_for_hybrid"
     val output = "merged.lz"
 
 
-    println("Load suffix")
-    val suffix = scala.io.Source.fromFile(localradix).getLines.toArray.map(_.toInt)
-
-    println("broadcasting")
-    val SA = spark.sparkContext.broadcast(suffix)
-
     // broadcast plain ref (needed for pattern matching)
     //val reference = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
-    val ref = scala.io.Source.fromFile(localref).getLines.mkString("")
 
+
+    //println("sorting")
+    //val sorted = Process("sort -n " + localOut).lineStream
+
+    println("Load suffix")
+    //val suffix = scala.io.Source.fromFile(localOut).getLines.toArray.map(_.toInt)
+    spark.sparkContext.hadoopConfiguration.set("textinputformat.record.delimiter", ">")
+    val splitted = spark.sparkContext.textFile(dataPath).map{v =>
+        //val groups = v.grouped(x._1._2.length()/numSplits).toArray
+        //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+        val header = v.trim().split(System.lineSeparator())(0)
+        println(header)
+        if(header.length>1){
+          val lineless = v.substring(header.length).replaceAll(System.lineSeparator(), "")
+          (header.split(" ")(0),lineless.length,lineless)
+        }
+        else
+          (null)
+      }.filter(c=>c!=null)
+
+    val nref = splitted.take(refsize)
+    val pw = new PrintWriter(new File("ref"+chr+".fa"))
+    //pw.write(">"+ref._1.split("/").last+"\n")
+    nref.foreach(x => pw.write(x._3))
+    pw.close()
+    val createSA = Process(radixSA + " ref"+chr+".fa " + localOut).!
+    val split = Process("./split.sh "+localOut+" "+refsize+ " "+chr).!
+
+    //spark.sparkContext.textFile(localOut).coalesce(refsize).saveAsTextFile(localradix)
+    //val splitSA = Process("split ref.fa " + localOut).!
+    /*var i = 0
+    for(i <- 1 to refsize){
+
+    }*/
+
+    val sa1 = ArrayBuffer[(String)]()
+    val sa2 = ArrayBuffer[(String)]()
+    val sa3 = ArrayBuffer[(String)]()
+    val sa4 = ArrayBuffer[(String)]()
+    val sa5 = ArrayBuffer[(String)]()
+    val sa6 = ArrayBuffer[(String)]()
+    val sa7 = ArrayBuffer[(String)]()
+    val sa8 = ArrayBuffer[(String)]()
+
+    for(i <- 0 to refsize-1){
+
+      i match {
+        case 0  => sa1.appendAll(scala.io.Source.fromFile("x00.chr"+chr).getLines.toTraversable)
+        case 1  => sa2.appendAll(scala.io.Source.fromFile("x01.chr"+chr).getLines.toTraversable)
+        case 2  => sa3.appendAll(scala.io.Source.fromFile("x02.chr"+chr).getLines.toTraversable)
+        case 3  => sa4.appendAll(scala.io.Source.fromFile("x03.chr"+chr).getLines.toTraversable)
+        case 4  => sa5.appendAll(scala.io.Source.fromFile("x04.chr"+chr).getLines.toTraversable)
+        case 5  => sa6.appendAll(scala.io.Source.fromFile("x05.chr"+chr).getLines.toTraversable)
+        case 6  => sa7.appendAll(scala.io.Source.fromFile("x06.chr"+chr).getLines.toTraversable)
+        case 7  => sa8.appendAll(scala.io.Source.fromFile("x07.chr"+chr).getLines.toTraversable)
+        // catch the default with a variable so you can print it
+        case default  => ArrayBuffer[(String)]()
+      }
+
+    }
+
+    val SAbc1 = spark.sparkContext.broadcast(sa1)
+    val SAbc2 = spark.sparkContext.broadcast(sa2)
+    val SAbc3 = spark.sparkContext.broadcast(sa3)
+    val SAbc4 = spark.sparkContext.broadcast(sa4)
+    val SAbc5 = spark.sparkContext.broadcast(sa5)
+    val SAbc6 = spark.sparkContext.broadcast(sa6)
+    val SAbc7 = spark.sparkContext.broadcast(sa7)
+    val SAbc8 = spark.sparkContext.broadcast(sa8)
+
+    val ref = scala.io.Source.fromFile("ref"+chr+".fa").getLines.mkString("")
     val reference = spark.sparkContext.broadcast(ref)
 
 
-    val gaps = spark.read.text(dataPath)
-      .select(org.apache.spark.sql.functions.input_file_name, $"value")
-      .as[(String, String)]
-      .rdd.map{v=>
-      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-      val gapless = v._2.replaceAll("-", "")
+    def getsuf(lb: Int) : Int = {
 
-      val fname = v._1.toString.split("/")
-      val header = ">"+fname(fname.length-1)+System.lineSeparator()
+      val chunk = lb/(SAbc1.value.length)
+      chunk match {
+        case 0  => return SAbc1.value(lb-chunk*SAbc1.value.length).toInt
+        case 1  => return SAbc2.value(lb-chunk*SAbc1.value.length).toInt
+        case 2  => return SAbc3.value(lb-chunk*SAbc1.value.length).toInt
+        case 3  => return SAbc4.value(lb-chunk*SAbc1.value.length).toInt
+        case 4  => return SAbc5.value(lb-chunk*SAbc1.value.length).toInt
+        case 5  => return SAbc6.value(lb-chunk*SAbc1.value.length).toInt
+        case 6  => return SAbc7.value(lb-chunk*SAbc1.value.length).toInt
+        case 7  => return SAbc8.value(lb-chunk*SAbc1.value.length).toInt
+        // catch the default with a variable so you can print it
+        case default  => return 0
+      }
 
-      header+gapless
     }
-
-    gaps.saveAsTextFile(hdfsgapless)
-
-    val splitted = spark.read.text(dataPath)
-      .select(org.apache.spark.sql.functions.input_file_name, $"value")
-      .as[(String, String)]
-      .rdd.map{v=>
-      val gapless = v._2.replaceAll("-", "")
-
-      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-      (v._1,gapless.length,gapless)
-    }
-
-
 
     //val createSA = Process(radixSA + " " + localref + " " + localOut).!
     //println("sorting")
     //val sorted = Process("sort -n " + localOut).lineStream
 
-
-    println("removing")
-    //val removed = new File(localOut).delete()
-
     // load the output
-    println("loading to spark")
+    println("loaded to spark")
     // create a stream
     //val SA_tmp = for(i <- sorted) yield {
     //  val xSplit = i.split(" ")
@@ -110,14 +158,14 @@ object DistributedRLZGaps {
     // the ith positions are compared
     // essentially to find the longest match this function needs to called in loop
     // until the interval does not decrease
-    def binarySearch(lb: Int, rb: Int, d_b: Broadcast[String], cur: Char, i: Int, SA_b: Broadcast[Array[Int]]): Option[(Int, Int)] = {
+    def binarySearch(lb: Int, rb: Int, d_b: Broadcast[String], cur: Char, i: Int): Option[(Int, Int)] = {
       val d = d_b.value
       var low = lb
       var high = rb
       while (low < high) {
         val mid = low + ((high - low) / 2)
         // get the true position
-        val midKey = SA_b.value(mid) + i
+        val midKey = getsuf(mid) + i
 
         // different "layers"
         val midValue = if (midKey < d.length()) {
@@ -138,13 +186,13 @@ object DistributedRLZGaps {
       //println("----------------")
 
       // break if key not found
-      if ((SA_b.value(low_res) + i)>= d.length || d(SA_b.value(low_res) + i) != cur) {
+      if ((getsuf(low_res) + i)>= d.length || d(getsuf(low_res) + i) != cur) {
         return None
       }
       high = rb
       while (low < high) {
         val mid = low + ((high - low) / 2)
-        val midKey = SA_b.value(mid) + i
+        val midKey = getsuf(mid) + i
         // different "layers"
         val midValue = if (midKey < d.length()) {
           d(midKey)
@@ -159,7 +207,7 @@ object DistributedRLZGaps {
         }
       }
       //println("value: " + d(SA.value(low) + i) + " cur: " + cur + " lo: " + low)
-      if (SA_b.value(low) != d.length() - 1 && SA_b.value(low)+i< d.length() && d(SA_b.value(low) + i) != cur) {
+      if (getsuf(low) != d.length() - 1 && getsuf(low)+i< d.length() && d(getsuf(low) + i) != cur) {
         //if(low_res>low-1) {
         //  return Some((low_res,low))
         //}
@@ -178,7 +226,7 @@ object DistributedRLZGaps {
 
     // check newline to deal with partition borders (stop phrase search if goes
     // to newline
-    def factor(i: Int, x: String, d_b: Broadcast[String], SA_b: Broadcast[Array[Int]]): (String, Long) = {
+    def factor(i: Int, x: String, d_b: Broadcast[String]): (String, Long) = {
       val d = d_b.value
       var lb = 0
       var rb = d.length()-1 // check suffix array size
@@ -187,15 +235,15 @@ object DistributedRLZGaps {
         while (j < x.length()) {
           //println("j: " + j + " SA.value: " + SA.value(lb))
           //println((SA.value(lb)+j-i) + " " + d.length())
-          if((SA_b.value(lb)+j-i) >= d.length()) {
+          if((getsuf(lb)+j-i) >= d.length()) {
             //println("breaking")
             //break
           }
-          if (lb == rb && d(SA_b.value(lb) + j - i) != x(j)) {
+          if (lb == rb && d(getsuf(lb) + j - i) != x(j)) {
             break
           }
           //(lb,rb) = refine(lb,rb,j-i,x(j))
-          val tmp = binarySearch(lb, rb, d_b, x(j), j - i,SA_b)
+          val tmp = binarySearch(lb, rb, d_b, x(j), j - i)
           //println(tmp)
 
           // perhaps needs more rules
@@ -238,20 +286,22 @@ object DistributedRLZGaps {
       } else {
         //println("täällä")
 
-        return (SA_b.value(lb).toString(), j - i)
+        return (getsuf(lb).toString(), j - i)
       }
     }
 
     // encode a single substring x
     // finds the longest possible match and returns
     // (pos,len) pair(s)
-    def encode(x: String, d_b: Broadcast[String],SA_b: Broadcast[Array[Int]]): ArrayBuffer[(String, Long)] = {
+    def encode(x: String, d_b: Broadcast[String]): ArrayBuffer[(String, Long)] = {
       var i: Int = 0
       val max = Int.MaxValue
       val output = ArrayBuffer[(String, Long)]()
+
       while (i < x.length()) {
         //println(i)
-        val tup = factor(i, x, d_b,SA_b)
+
+        val tup = factor(i, x, d_b)
         //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         output += tup
         if (tup._2 == 0) {
@@ -271,7 +321,7 @@ object DistributedRLZGaps {
 
     //val maxSplit = filteredTmp.map(_._2).max()
     splitted.foreach{x =>
-      val encodings = encode(x._3,reference,SA)
+      val encodings = encode(x._3,reference)
       //if(x._2==0) {
       //val newLine = (rsize,1L)
       //encodings.prepend(("\n",0))
@@ -289,10 +339,10 @@ object DistributedRLZGaps {
         //val nf = new DecimalFormat("#0000000")
         val fname = x._1.toString.split("/")
 
-        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".pos"))
+        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".lz"))
       } catch {
         case e: IOException =>
-        //e.printStackTrace()
+          //e.printStackTrace()
       }
 
       encodings.foreach{z =>

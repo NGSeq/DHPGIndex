@@ -121,8 +121,6 @@ class Occurrence {
       message.replace(third_occ + 1, fourth_occ - third_occ - 1, std::to_string(new_pos+1));
 
       if (new_chr_name.length() != 0) {
-          string oldname = message.substr(first_occ + 1, second_occ - first_occ - 1);
-          cout << oldname << "new name" <<  new_chr_name << endl;
         message.replace(second_occ + 1, third_occ - second_occ - 1, new_chr_name);
       }
 

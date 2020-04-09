@@ -45,7 +45,6 @@ object DistributedRLZ2 {
 
     val reference = spark.sparkContext.broadcast(ref)
 
-
     val splitted = spark.read.text(dataPath)
       .select(org.apache.spark.sql.functions.input_file_name, $"value")
       .as[(String, String)]
@@ -53,7 +52,7 @@ object DistributedRLZ2 {
       //val groups = v.grouped(x._1._2.length()/numSplits).toArray
       //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
       (v._1,v._2.length,v._2)
-    }
+    }.sortBy(v=>v._2, false)
 
     //val createSA = Process(radixSA + " " + localref + " " + localOut).!
     //println("sorting")
@@ -168,10 +167,10 @@ object DistributedRLZ2 {
         while (j < x.length()) {
           //println("j: " + j + " SA.value: " + SA.value(lb))
           //println((SA.value(lb)+j-i) + " " + d.length())
-          if((SA_b.value(lb)+j-i) >= d.length()) {
+          /*if((SA_b.value(lb)+j-i) >= d.length()) {
             //println("breaking")
             //break
-          }
+          }*/
           if (lb == rb && d(SA_b.value(lb) + j - i) != x(j)) {
             break
           }
@@ -270,7 +269,7 @@ object DistributedRLZ2 {
         //val nf = new DecimalFormat("#0000000")
         val fname = x._1.toString.split("/")
 
-        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".pos"))
+        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".lz"))
       } catch {
         case e: IOException =>
           //e.printStackTrace()

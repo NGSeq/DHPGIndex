@@ -14,6 +14,8 @@
 #include <sdsl/select_support.hpp>
 #include <sdsl/enc_vector.hpp>
 #include <sdsl/coder_elias_delta.hpp>
+#include <sdsl/wavelet_trees.hpp>
+
 
 using sdsl::int_vector;
 using sdsl::util::clear;

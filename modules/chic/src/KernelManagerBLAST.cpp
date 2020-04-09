@@ -39,6 +39,7 @@ KernelManagerBLAST::KernelManagerBLAST(uchar * input_kernel_text,
   bt2_command_index += " " + kernel_text_filename;
   //bt2_command_index += " -blastdb_version 5 ";
   bt2_command_index += " -dbtype nucl ";
+  bt2_command_index += " -max_file_sz 2000000000 ";
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
 
   if (verbose > 1) {
@@ -79,6 +80,7 @@ KernelManagerBLAST::KernelManagerBLAST(char * _kernel_text_filename,
   bt2_command_index += " " + kernel_text_filename;
   //bt2_command_index += " -blastdb_version 5 ";
   bt2_command_index += " -dbtype nucl ";
+  bt2_command_index += " -max_file_sz 2000000000 ";
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
 
   if (verbose > 1) {
@@ -144,26 +146,26 @@ vector<Occurrence>  KernelManagerBLAST::LocateOccsFQ(char * query_filename,
   string  tmp_out_filename = "./aligned_to_kernel.blast";  // TODO: a better name ?
   string bt2_command_align;
   string all_flags;
-  if (retrieve_all) {
-    all_flags.assign(" -a");  // bowties uses same flag as bwa. It's ok.
-  } else {
-    all_flags.assign("");
-  }
+
+  all_flags.assign("");
   all_flags += " -num_threads "+std::to_string(n_threads);
   //all_flags += " --very-sensitive"; 
 
-  /*for (size_t i = 0; i < kernel_options.size(); i++) {
-    all_flags += " "+kernel_options[i];
-  }*/
   //bt2_command_align.assign(PROJECT_ROOT);
-  bt2_command_align = "blastn " + all_flags;
+  bt2_command_align = "/opt/blast/bin/blastn " + all_flags;
   bt2_command_align += " -db " + kernel_text_filename;  // we have used kernel_text_filename as basename for the index, should be ok.
 
     bt2_command_align += " -query "+ string(query_filename);
     //bt2_command_align += " -1 "+ string(query_filename);
     //bt2_command_align += " -2 "+ string(mates_filename);
     // # Fields: query , subject , % identity, alignment length, mismatches, gap opens, q. start, q. end, s. start, s. end, evalue, bit score
-  bt2_command_align += " -outfmt 6 ";
+  if(kernel_options.size()>0)
+    for (size_t i = 0; i < kernel_options.size(); i++) {
+      bt2_command_align += " "+kernel_options[i];
+    }
+  else{
+      bt2_command_align += " -outfmt 6 ";
+  }
   bt2_command_align += " -out "+ tmp_out_filename;
   bt2_command_align+= " 2> " + tmp_out_filename + ".log.stderr";
   if (verbose > 1) {

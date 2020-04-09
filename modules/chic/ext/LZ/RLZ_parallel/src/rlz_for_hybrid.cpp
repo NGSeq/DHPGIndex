@@ -17,7 +17,7 @@
 #include "../../LZscan/algorithm/lzscan.h"
 
 int main(int argc, char **argv) { 
-  bool force_large = false;
+  bool force_large = true;
   if (argc != 9) {
     fprintf(stderr, "usage: encode [REFERENCE_FILE] [REFERENCE_SIZE] [INPUT] [OUTPUT] [N_CHUNKS] [N_THREADS] [MAX_MEM_MB]\n");
     exit(EXIT_FAILURE);

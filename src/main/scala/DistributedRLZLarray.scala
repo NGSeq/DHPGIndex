@@ -5,13 +5,12 @@ import java.net.URI
 import java.nio.ByteBuffer
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.hadoop.hdfs.DFSClient
 import org.apache.spark.sql.SparkSession
 import xerial.larray.LArray
 
 import scala.collection.mutable.ArrayBuffer
-import scala.sys.process._
 import scala.util.control.Breaks._
 
 object DistributedRLZLarray {
@@ -20,45 +19,44 @@ object DistributedRLZLarray {
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
+    import spark.implicits._
 
-    val refPath = args(0)
-    val splitPath = args(1) // number of refs
-    val numSplits = args(2).toInt // control how many splits we want for the data
-    val radixFile = args(3)
+
+    val localradix = args(0)
+    val localref = args(1)
+
+    val dataPath = args(2)
+    val hdfsurl = args(3)
     val hdfsout = args(4)
 
-    //val pgrefs = args(3).toInt //
-
     val radixSA = "./radixSA"
-    val refLocal = "radixin.txt"
-    //val radixFile = "radixout.txt"
+
+    val localOut = "radixout.txt"
     val refParse = "./rlz_for_hybrid"
     val output = "merged.lz"
-    // download the data that is generated using vcf multialign
-    // get the file name (patient name) for fasta flagdata.count()
 
-    /*val data = spark.read.text(pgPath)
-      .select(input_file_name, $"value")
+
+    //println("Load suffix")
+    //val suffix = scala.io.Source.fromFile(localradix).getLines.toArray.map(_.toInt)
+
+    println("broadcasting")
+    //val SA = spark.sparkContext.broadcast(suffix)
+
+    // broadcast plain ref (needed for pattern matching)
+    //val reference = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
+    val ref = scala.io.Source.fromFile(localref).getLines.mkString("")
+
+    val reference = spark.sparkContext.broadcast(ref)
+
+
+    val splitted = spark.read.text(dataPath)
+      .select(org.apache.spark.sql.functions.input_file_name, $"value")
       .as[(String, String)]
-      .rdd*/
-    //val data = spark.sparkContext.wholeTextFiles(pgPath)//.sortBy(_._1)
-
-    // now hard coded ref
-    //val ref = data.take(1)//.slice(10000,150000)
-    import java.util
-
-    import org.apache.hadoop.fs.FileSystem
-
-    val fs = FileSystem.get(new Configuration())
-    val pgFileList = new util.ArrayList[String]
-
-    val st = fs.listStatus(new Path(refPath))
-    st.foreach{s=>
-        pgFileList.add(s.getPath.toUri.getRawPath)
+      .rdd.map{v=>
+      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
+      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+      (v._1,v._2.length,v._2)
     }
-    val reffile = pgFileList.get(0)
-    val reflength = st(0).getLen
-    println("REFLEN:::::"+reflength)
 
     //TODO:splittaa data valmiiksi HDFSään(eri kansioihin) ja lue splitin pituus tiedostosta
     //sed -i 's/./&\n/200;s/./&\n/500' ./t
@@ -108,8 +106,6 @@ object DistributedRLZLarray {
     //println("creating hashmap")
     //val SA_hash = HashMap(SA_tmp: _*)
     // broadcast the hash table
-    println("broadcasting")
-    val rlen = spark.sparkContext.broadcast(reflength)
     // broadcast plain ref (needed for pattern matching)
     //val parsedRef = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
     //val SA.value_tmp = Array(9, 4, 8, 6, 2, 3, 7, 5, 1).map(_ - 1).zipWithIndex.sortBy(_._1)
@@ -126,7 +122,7 @@ object DistributedRLZLarray {
     // the ith positions are compared
     // essentially to find the longest match this function needs to called in loop
     // until the interval does not decrease
-    def binarySearch(lb: Long, rb: Long, ref: LArray[Char], cur: Char, i: Int, SA_b: LArray[Long]): Option[(Long, Long)] = {
+    def binarySearch(lb: Int, rb: Int, ref: String, cur: Char, i: Int, SA_b: LArray[Int]): Option[(Int, Int)] = {
 
       var low = lb
       var high = rb
@@ -199,9 +195,9 @@ object DistributedRLZLarray {
 
     // check newline to deal with partition borders (stop phrase search if goes
     // to newline
-    def factor(i: Int, split: String, ref: LArray[Char], SA_b: LArray[Long]): (String, Int) = {
+    def factor(i: Int, split: String, ref:String, SA_b: LArray[Int]): (String, Long) = {
 
-      var lb = 0L
+      var lb = 0
       var rb = ref.length-1 // check suffix array size
       var j = i
       breakable {
@@ -267,42 +263,31 @@ object DistributedRLZLarray {
     // encode a single substring x
     // finds the longest possible match and returns
     // (pos,len) pair(s)
-    def encode(split: String, reflen: Long): ArrayBuffer[(String, Int)] = {
+    def encode(split: String): ArrayBuffer[(String, Long)] = {
       var i: Int = 0
       val max = Int.MaxValue
-      val output = ArrayBuffer[(String, Int)]()
+      val output = ArrayBuffer[(String, Long)]()
 
-      val client = new DFSClient(URI.create("hdfs://ambari.novalocal:8020"), new Configuration())
-      var radixstream = client.open(radixFile)
+      val client = new DFSClient(URI.create(hdfsurl), new Configuration())
+      var radixstream = client.open(localradix)
       val bfr = new BufferedReader(new InputStreamReader(radixstream))
-      var refstream = client.open(reffile)
-      val bfref = new BufferedReader(new InputStreamReader(refstream))
 
-      val SA_b =  LArray.of[Long](reflen)
+      val SA_b =  LArray.of[Int](reference.value.length)
 
       var line: String = bfr.readLine()
 
       var l = 0L
       while (line != null) {
-        SA_b(l)=java.lang.Long.valueOf(line.stripLineEnd)
+        SA_b(l)=java.lang.Integer.valueOf(line.stripLineEnd)
         line = bfr.readLine()
         l+=1
-      }
-
-      val ref =  LArray.of[Char](reflen)
-      var value: Int = bfref.read()
-      var cnt = 0
-      while ( {value != -1}) {
-        val c =value.asInstanceOf[Char]
-        ref(cnt)=c
-        cnt+=1
-        value = bfref.read()
       }
 
       while (i < split.length) {
         //println(i)
 
-        val tup = factor(i, split, ref, SA_b)
+        val tup = factor(i, split, reference.value, SA_b)
+        //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         output += tup
         if (tup._2 == 0) {
@@ -311,12 +296,12 @@ object DistributedRLZLarray {
           if(i+tup._2>=max) {
             i = split.length()
           } else {
-            i += tup._2
+            i += tup._2.toInt
           }
         }
       }
+
       SA_b.free
-      ref.free
 
       return output
     }
@@ -324,7 +309,6 @@ object DistributedRLZLarray {
     //val rsize = (ref._2.length()).toString
     //val nonParsedRef = splitted.filter(x => !nref.map(_._1.split("/").last).contains(x._1))
     //val maxSplit = nonParsedRef.map(_._2).max()
-    import spark.implicits._
     /*val nonParsedRef = spark.read.text(splitPath)
       .select(org.apache.spark.sql.functions.input_file_name, $"value")
       .as[(String, String)]
@@ -334,20 +318,12 @@ object DistributedRLZLarray {
       v._1._2.map(y => (y._1,v._2,y._2.length,y._2))
     }*/
 
-    val nonParsedRef = spark.read.text(splitPath)
-      .select(org.apache.spark.sql.functions.input_file_name, $"value")
-      .as[(String, String)]
-      .rdd.map{v=>
-      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-     (v._1,v._2.length,v._2)
-    }
 
-    val encoded = nonParsedRef.map{x =>
+    splitted.foreach{x =>
       //val client = new DFSClient(URI.create("hdfs://m1.novalocal:8020"), new Configuration())
       //val SA = client.open("/user/root/radixout.txt")
 
-      val encodings = encode(x._3,rlen.value)
+      val encodings = encode(x._3)
       //if(x._2==0) {
       //val newLine = (rsize,1L)
       //encodings.prepend(("\n",0))
@@ -357,57 +333,32 @@ object DistributedRLZLarray {
       //add fasta
       //encodings.prependAll(encode("\n>"+x._1+"\n",parsedRef,SA))
       //}
-      ((x._1,x._2,x._3),encodings)
-    }
-    //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,parsedRef,SA)))
-    //splitted.map(x => ((x._1,x._2),x._3)).sortBy(_._1).map(_._2).saveAsTextFile("real")
-
-    //compress parsedRef using LZ77
-
-    //turbofix to remove '\n'. Currently the algorithm does not seem to write out of ref alphabet
-    //chars properly TODO!!
-    //val fix = Process("truncate -s-1 " + localIn).!
-    val LZ77 = Process(refParse + " " + refLocal + " 1 " + refLocal + " " + output + " 4 4 5000 0").!
-    //val LZ7 = new LZ77()
-    //val refLZ = LZ7.compress(ref._2)
-
-    // order so that the output is written properly
-    val ordered = encoded.coalesce(numSplits).sortBy(_._1._2)
-
-    // create bytearrays and collect to master via iterator (to prevent driver memory from
-    // getting full)
-   //encoded.saveAsTextFile(hdfsout)
-
-    ordered.foreach{part=>
-
-      var values=part._2.toArray
-
       var fos: FSDataOutputStream = null
-      val fis = FileSystem.get(new URI("hdfs://ambari.novalocal:8020"),new Configuration())
+      val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
 
-     try {
+      try {
         //val nf = new DecimalFormat("#0000000")
-        val fname = part._1._1.toString.split("/")
+        val fname = x._1.toString.split("/")
 
-        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".pos"))
+        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+".lz"))
       } catch {
         case e: IOException =>
-          e.printStackTrace()
+        //e.printStackTrace()
       }
 
-      values.foreach{x =>
+      encodings.foreach{z =>
         //println(x._1+","+x._2)
         var posBytes: Array[Byte] = null
 
-        val len = x._2
+        val len = z._2
         if(len != 0) {
-          posBytes = ByteBuffer.allocate(8).putLong(x._1.toLong).array.reverse
+          posBytes = ByteBuffer.allocate(8).putLong(z._1.toLong).array.reverse
           //posBytes = x._1.getBytes
         }
         else {
           //posBytes = ByteBuffer.allocate(8).putLong(rsize).array.reverse
           //len = 1
-          posBytes = ByteBuffer.allocate(8).putLong(x._1(0).toLong).array.reverse
+          posBytes = ByteBuffer.allocate(8).putLong(z._1(0).toLong).array.reverse
           //posBytes = x._1(0).toString.getBytes
         }
         val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
@@ -417,8 +368,16 @@ object DistributedRLZLarray {
         //println(x._1,len)
         fos.write(posBytes)
         fos.write(lenBytes)
+    }
+    //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,parsedRef,SA)))
+    //splitted.map(x => ((x._1,x._2),x._3)).sortBy(_._1).map(_._2).saveAsTextFile("real")
 
-      }
+    //compress parsedRef using LZ77
+
+    //turbofix to remove '\n'. Currently the algorithm does not seem to write out of ref alphabet
+    //chars properly TODO!!
+    //val fix = Process("truncate -s-1 " + localIn).!
+
 
       /*try
         fos.write(baos)

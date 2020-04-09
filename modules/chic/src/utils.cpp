@@ -171,7 +171,7 @@ string SamRecordForUnmapped(string read_name) {
 }
 
 bool IsBioKernel(KernelType kernel_type) {
-  return (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2);
+  return (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST);
 }
 
 bool IsNewLine(uchar c) {
