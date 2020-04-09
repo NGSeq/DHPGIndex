@@ -764,7 +764,7 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
   this->sparse_sample_ratio = SPARSE_DENS;
   this->verbose = _verbose;
   this->n_threads = _n_threads;
-  this->index_prefix = _prefix;f
+  this->index_prefix = _prefix;
   this->tmp_seq = NULL;
   SetFileNames();
 
