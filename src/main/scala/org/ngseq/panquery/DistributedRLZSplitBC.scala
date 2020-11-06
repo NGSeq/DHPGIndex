@@ -1,6 +1,6 @@
 package org.ngseq.panquery
 
-import java.io._
+import java.io.{File, IOException, PrintWriter}
 import java.net.URI
 import java.nio.ByteBuffer
 
@@ -10,7 +10,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.Process
-import scala.util.control.Breaks._
+import scala.util.control.Breaks.{break, breakable}
 
 object DistributedRLZSplitBC {
 

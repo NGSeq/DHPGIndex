@@ -1,4 +1,6 @@
-import java.io._
+package org.ngseq.panquery
+
+import java.io.{File, IOException, PrintWriter}
 import java.net.URI
 import java.nio.ByteBuffer
 import java.text.DecimalFormat
@@ -9,44 +11,60 @@ import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.Process
-import scala.util.control.Breaks._
+import scala.util.control.Breaks.{break, breakable}
 
-object DistributedRLZ {
+object DistributedRLZShortSeqsW{
 
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
-    import spark.implicits._
 
-    val chr = args(0).toInt
-    val dataPath = args(1)
-    val hdfsurl = args(2)
-    val hdfsout = args(3)
-    val refsize = args(4).toInt
-    val sasplitsize  = args(5).toInt
+    val nf2 = new DecimalFormat("#0000")
+    val dataPath = args(0)
+    val hdfsurl = args(1)
+    val hdfsout = args(2)
+    val refsize = args(3).toInt
+    val sasplitsize  = args(4).toInt
+    val numpart  = args(5).toInt
     //val refsplitsize  = args(6).toInt
-    val chunks = args(6).toInt
-    val radixSA = "/mnt/tmp/radixSA"
+    val radixSA = "/opt/chic/radixSA"
 
-    val localOut = "/mnt/tmp/radixout."+chr
-    val refParse = "./rlz_for_hybrid"
-    val output = "merged.lz"
+    val localOut = "/mnt/tmp/radixout"
 
     println("Load and preprocess pan-genome")
-    val splitted = spark.read.text(dataPath).select(org.apache.spark.sql.functions.input_file_name, $"value")
-       .as[(String, String)]
-       .rdd.flatMap{v=>
-       val gapless = v._2.replaceAll("-", "")
-       val groups = gapless.grouped(v._2.length/chunks).toArray
-       groups.zipWithIndex.map(y => (v._1,y._1.length,y._1,y._2))
+    //spark.sparkContext.hadoopConfiguration.set("textinputformat.record.delimiter",">")
+    //val conf = new Configuration(spark.sparkContext.hadoopConfiguration)
+    //conf.set("textinputformat.record.delimiter", ">")
 
-     }.groupBy(g => g._4)
+    //println("sorting")
+    //val sorted = Process("sort -n " + localOut).lineStream
 
-    println("Divided pan-genome to "+splitted.getNumPartitions+" groups")
+    println("Load data")
+
+    val splitted = spark.sparkContext.wholeTextFiles(dataPath,numpart)
+      .flatMap{rec=>
+      //val header = rec._2.substring(1,rec._2.indexOf(System.lineSeparator))
+        val split = rec._2.split(">")
+        val seqs = ArrayBuffer[(String,Int,String)]()
+        System.out.println(rec._1)
+
+        for(i <- 0 to split.length){
+          var seq = ""
+          if(rec._2.length>0)
+          //if(rec._2.indexOf(System.lineSeparator) > 0)
+            seq = rec._2.substring(rec._2.indexOf(System.lineSeparator)).trim
+          seqs.append((rec._1+"_"+nf2.format(i),seq.length,seq))
+
+        }
+        seqs
+
+    }
+
+    //println("Divided pan-genome to "+splitted.count+" ")
     println("Started distributed RLZ")
-    splitted.foreach{group=>
-      val refs = group._2.take(refsize)
-      val reffile = "/mnt/tmp/ref"+chr+"_"+group._1
+
+      val refs = splitted.take(refsize)
+      val reffile = "/mnt/tmp/ref.fa"
       val pw = new PrintWriter(new File(reffile))
       refs.foreach(x => pw.write(x._3))
       pw.close()
@@ -55,7 +73,7 @@ object DistributedRLZ {
       var radixparams = ""
       if(reflength>800000000)
         radixparams = "-w "
-      val radixout = localOut+"_"+group._1
+      val radixout = localOut
       println("Creating Suffix Array from reference sequence of length" +reflength)
       val createSA = Process(radixSA + " "+radixparams+" "+reffile+" " + radixout).!
       /*
@@ -109,26 +127,46 @@ object DistributedRLZ {
 
       }
 
+    val SAbc1 = spark.sparkContext.broadcast(sa1)
+    val SAbc2 = spark.sparkContext.broadcast(sa2)
+    val SAbc3 = spark.sparkContext.broadcast(sa3)
+    val SAbc4 = spark.sparkContext.broadcast(sa4)
+    val SAbc5 = spark.sparkContext.broadcast(sa5)
+    val SAbc6 = spark.sparkContext.broadcast(sa6)
+    val SAbc7 = spark.sparkContext.broadcast(sa7)
+    val SAbc8 = spark.sparkContext.broadcast(sa8)
+    val SAbc9 = spark.sparkContext.broadcast(sa9)
+    val SAbc10 = spark.sparkContext.broadcast(sa10)
+    val SAbc11 = spark.sparkContext.broadcast(sa11)
+    val SAbc12 = spark.sparkContext.broadcast(sa12)
+    val SAbc13 = spark.sparkContext.broadcast(sa13)
+    val SAbc14 = spark.sparkContext.broadcast(sa14)
+    val SAbc15 = spark.sparkContext.broadcast(sa15)
+    val SAbc16 = spark.sparkContext.broadcast(sa16)
+
+    val refBC = spark.sparkContext.broadcast(ref)
+
+
     def getsuf(lb: Int) : Int = {
 
-      val chunk = lb/(sa1.length)
+      val chunk = lb/(SAbc1.value.length)
       chunk match {
-        case 0  => return sa1(lb-chunk*sa1.length).toInt
-        case 1  => return sa2(lb-chunk*sa1.length).toInt
-        case 2  => return sa3(lb-chunk*sa1.length).toInt
-        case 3  => return sa4(lb-chunk*sa1.length).toInt
-        case 4  => return sa5(lb-chunk*sa1.length).toInt
-        case 5  => return sa6(lb-chunk*sa1.length).toInt
-        case 6  => return sa7(lb-chunk*sa1.length).toInt
-        case 7  => return sa8(lb-chunk*sa1.length).toInt
-        case 8  => return sa9(lb-chunk*sa1.length).toInt
-        case 9  => return sa10(lb-chunk*sa1.length).toInt
-        case 10  => return sa11(lb-chunk*sa1.length).toInt
-        case 11  => return sa12(lb-chunk*sa1.length).toInt
-        case 12  => return sa13(lb-chunk*sa1.length).toInt
-        case 13  => return sa14(lb-chunk*sa1.length).toInt
-        case 14  => return sa15(lb-chunk*sa1.length).toInt
-        case 15  => return sa16(lb-chunk*sa1.length).toInt
+        case 0  => return SAbc1.value(lb-chunk*SAbc1.value.length).toInt
+        case 1  => return SAbc2.value(lb-chunk*SAbc1.value.length).toInt
+        case 2  => return SAbc3.value(lb-chunk*SAbc1.value.length).toInt
+        case 3  => return SAbc4.value(lb-chunk*SAbc1.value.length).toInt
+        case 4  => return SAbc5.value(lb-chunk*SAbc1.value.length).toInt
+        case 5  => return SAbc6.value(lb-chunk*SAbc1.value.length).toInt
+        case 6  => return SAbc7.value(lb-chunk*SAbc1.value.length).toInt
+        case 7  => return SAbc8.value(lb-chunk*SAbc1.value.length).toInt
+        case 8  => return SAbc9.value(lb-chunk*SAbc1.value.length).toInt
+        case 9  => return SAbc10.value(lb-chunk*SAbc1.value.length).toInt
+        case 10  => return SAbc11.value(lb-chunk*SAbc1.value.length).toInt
+        case 11  => return SAbc12.value(lb-chunk*SAbc1.value.length).toInt
+        case 12  => return SAbc13.value(lb-chunk*SAbc1.value.length).toInt
+        case 13  => return SAbc14.value(lb-chunk*SAbc1.value.length).toInt
+        case 14  => return SAbc15.value(lb-chunk*SAbc1.value.length).toInt
+        case 15  => return SAbc16.value(lb-chunk*SAbc1.value.length).toInt
         // catch the default with a variable so you can print it
         case default  => return 0
       }
@@ -137,12 +175,14 @@ object DistributedRLZ {
 
     def getref(lb: Int) : Char = {
 
-      if(lb>=ref.length)
+      if(lb>=refBC.value.length)
         return "N"(0)
-      ref(lb)
+      refBC.value(lb)
 
     }
 
+    //val SA.value_tmp = Array(9, 4, 8, 6, 2, 3, 7, 5, 1).map(_ - 1).zipWithIndex.sortBy(_._1)
+    //val SA.value = HashMap(SA.value_tmp: _*)
 
     //val d = "cabbaabba"
     //val x = "ncabbaaabbaaa"
@@ -280,21 +320,22 @@ object DistributedRLZ {
     }
     println("started encoding")
 
-    var partid = 0
-    group._2.foreach{x =>
+    //var sampleid = 0
+    splitted.foreach{sample =>
       //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
-      val encodings = encode(x._3)
+      val encodings = encode(sample._3)
 
       var fos: FSDataOutputStream = null
       val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
       try {
-        val nf = new DecimalFormat("#0000")
-        val fname = nf.format(chr)+"_"+nf.format(partid)+"_"+nf.format(group._1) //.toString.split("/")
-
+        //val nf = new DecimalFormat("#0000")
+        val fname = sample._1.substring(sample._1.lastIndexOf("/")) //.toString.split("/")
+        //fos = fis.create(new Path(hdfsout+"/" + fname.replaceAll(" ","").replaceAll(":","-").replaceAll(",","-")))
         fos = fis.create(new Path(hdfsout+"/" + fname+".lz"))
+
       } catch {
         case e: IOException =>
-        //e.printStackTrace()
+          e.printStackTrace()
       }
 
       encodings.foreach{z =>
@@ -309,14 +350,36 @@ object DistributedRLZ {
         }
         val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
 
-        fos.write(posBytes)
-        fos.write(lenBytes)
+        try {
+          fos.write(posBytes)
+          fos.write(lenBytes)
+        }catch {
+          case e: NullPointerException =>
+            //e.printStackTrace()
+        }
       }
       fos.close()
 
-      partid+=1
+      //sampleid+=1
     }
-    }
+
+    //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,reference,SA)))
+    //splitted.map(x => ((x._1,x._2),x._3)).sortBy(_._1).map(_._2).saveAsTextFile("real")
+
+    //compress reference using LZ77
+
+    //turbofix to remove '\n'. Currently the algorithm does not seem to write out of ref alphabet
+    //chars properly TODO!!
+    //val fix = Process("truncate -s-1 " + localIn).!
+
+    //val LZ7 = new LZ77()
+    //val refLZ = LZ7.compress(ref._2)
+
+    // order so that the output is written properly
+    //val ordered = encoded.sortBy(_._1).flatMap(_._2)
+    //ordered.saveAsTextFile("/yarn/total/")
+
+
     spark.stop()
 
   }

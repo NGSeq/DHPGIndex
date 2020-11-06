@@ -1,38 +1,33 @@
-import java.io._
+package org.ngseq.panquery
+
+import java.io.{File, IOException, PrintWriter}
 import java.net.URI
 import java.nio.ByteBuffer
+import java.text.DecimalFormat
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.Process
-import scala.util.control.Breaks._
+import scala.util.control.Breaks.{break, breakable}
 
-object DistributedRLZ2GB {
+object DistributedRLZ2GBFasta {
 
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
-    import spark.implicits._
 
-    val chr = args(0)
-    val dataPath = args(1)
-    val hdfsurl = args(2)
-    val hdfsout = args(3)
-    val refsize = args(4).toInt
-    val fastaflag = args(5)
+    val dataPath = args(0)
+    val hdfsurl = args(1)
+    val hdfsout = args(2)
+    val refsize = args(3).toInt
 
-    val radixSA = "./radixSA"
+    val radixSA = "/opt/chic/radixSA"
 
-    val localOut = "radixout."+chr
-    val refParse = "./rlz_for_hybrid"
-    val output = "merged.lz"
-    val fasta = fastaflag.toBoolean
-
+    val localOut = "radixout"
 
     // broadcast plain ref (needed for pattern matching)
     //val reference = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
@@ -43,43 +38,29 @@ object DistributedRLZ2GB {
 
     println("Load suffix")
     //val suffix = scala.io.Source.fromFile(localOut).getLines.toArray.map(_.toInt)
-    var splitted: RDD[(String,Int,String)] = null
 
-    if(!fasta){
-      splitted = spark.read.text(dataPath).select(org.apache.spark.sql.functions.input_file_name, $"value")
-        .as[(String, String)]
-        .rdd.map{v=>
-        //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-        //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-        //val gapless = v._2.replaceAll("-", "")
-        (v._1,v._2.length,v._2)
-      }.sortBy(k=>k._2,false)
-    }else{
-      splitted = spark.sparkContext.textFile(dataPath).zipWithIndex()
-        .mapPartitions{v=>
+    println("Load and preprocess pan-genome")
+    spark.sparkContext.hadoopConfiguration.set("textinputformat.record.delimiter",">")
+    val conf = new Configuration(spark.sparkContext.hadoopConfiguration)
+    conf.set("textinputformat.record.delimiter", ">")
 
-        val header = v.next._1.split(" ")(0).replaceAll(System.lineSeparator(), "").substring(1)
-        var lineless = ""
-        while(v.hasNext){
-          lineless += v.next._1.replaceAll(System.lineSeparator(), "")
-        }
+    val data = spark.sparkContext.textFile(dataPath).filter(x=>x.length!=0)
 
-        //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-        //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-        //val gapless = v._2.replaceAll("-", "")
-        //val lineless = v._2.replaceAll(System.lineSeparator(), "")
-        println("LEN:"+lineless.length+ " "+header)
-        //(v._1,lineless.length,lineless)
-        Array{(header,lineless.length,lineless)}.toIterator
-      }.sortBy(k=>k._2,false)
+    val splitted = data.zipWithIndex().map{rec=>
+      val id = rec._2
+      val seq = rec._1.substring(rec._1.indexOf(System.lineSeparator)).replace(System.getProperty("line.separator"), "").trim
+      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
+      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+
+      (id,seq.length,seq)
     }
 
     val nref = splitted.take(refsize)
-    val pw = new PrintWriter(new File("ref"+chr+".fa"))
+    val pw = new PrintWriter(new File("ref.fa"))
     //pw.write(">"+ref._1.split("/").last+"\n")
     nref.foreach(x => pw.write(x._3))
     pw.close()
-    val createSA = Process(radixSA + " ref"+chr+".fa " + localOut).!
+    val createSA = Process(radixSA + " ref.fa " + localOut).!
 
     //val createSA = Process(radixSA + " " + localref + " " + localOut).!
     //println("sorting")
@@ -98,7 +79,7 @@ object DistributedRLZ2GB {
 
     // broadcast plain ref (needed for pattern matching)
     //val reference = spark.sparkContext.broadcast(">"+ref._1.split("/").last+"\n"+ref._2)
-    val ref = scala.io.Source.fromFile("ref"+chr+".fa").getLines.mkString("")
+    val ref = scala.io.Source.fromFile("ref.fa").getLines.mkString("")
 
     val reference = spark.sparkContext.broadcast(ref)
     // create a stream
@@ -263,13 +244,13 @@ object DistributedRLZ2GB {
     // encode a single substring x
     // finds the longest possible match and returns
     // (pos,len) pair(s)
-    def encode(x: String, d_b: Broadcast[String],SA_b: Broadcast[Array[Int]]): ArrayBuffer[(String, Long)] = {
+    def encode(x: String): ArrayBuffer[(String, Long)] = {
       var i: Int = 0
       val max = Int.MaxValue
       val output = ArrayBuffer[(String, Long)]()
       while (i < x.length()) {
         //println(i)
-        val tup = factor(i, x, d_b,SA_b)
+        val tup = factor(i, x, reference, SA)
         //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         output += tup
         if (tup._2 == 0) {
@@ -288,59 +269,45 @@ object DistributedRLZ2GB {
     //val rsize = (ref._2.length()).toString
 
     //val maxSplit = filteredTmp.map(_._2).max()
-    splitted.foreach{x =>
-      val encodings = encode(x._3,reference,SA)
-      //if(x._2==0) {
-      //val newLine = (rsize,1L)
-      //encodings.prepend(("\n",0))
-      //encodings += newLine
-      //encodings += ("\n",0)
-      //} else if(x._2 == 0) {
-      //add fasta
-      //encodings.prependAll(encode("\n>"+x._1+"\n",reference,SA))
-      //}
+    splitted.foreach{sample =>
+      //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
+      val encodings = encode(sample._3)
 
       var fos: FSDataOutputStream = null
       val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
-
       try {
-        //val nf = new DecimalFormat("#0000000")
-        val fname = x._1.toString.split("/")
+        val nf = new DecimalFormat("#00000000")
+        val fname = nf.format(sample._1)//.toString.split("/")
 
-
-        fos = fis.create(new Path(hdfsout+"/" + fname(fname.length-1)+"_"+java.util.UUID.randomUUID()+".lz"))
+        fos = fis.create(new Path(hdfsout+"/" + fname +".lz"))
       } catch {
         case e: IOException =>
-        //e.printStackTrace()
+          e.printStackTrace()
       }
 
       encodings.foreach{z =>
-        //println(x._1+","+x._2)
         var posBytes: Array[Byte] = null
 
         val len = z._2
         if(len != 0) {
           posBytes = ByteBuffer.allocate(8).putLong(z._1.toLong).array.reverse
-          //posBytes = x._1.getBytes
         }
         else {
-          //posBytes = ByteBuffer.allocate(8).putLong(rsize).array.reverse
-          //len = 1
           posBytes = ByteBuffer.allocate(8).putLong(z._1(0).toLong).array.reverse
-          //posBytes = x._1(0).toString.getBytes
         }
         val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
-        //(posBytes,lenBytes)
-        //val lenBytes = len.toString.getBytes
 
-        //println(x._1,len)
-        fos.write(posBytes)
-        fos.write(lenBytes)
-
+        try {
+          fos.write(posBytes)
+          fos.write(lenBytes)
+        }catch {
+          case e: NullPointerException =>
+          //e.printStackTrace()
+        }
       }
-
       fos.close()
 
+      //sampleid+=1
     }
     //val encoded = splitted.map(x => ((x._1,x._2),encode(x._3,reference,SA)))
     //splitted.map(x => ((x._1,x._2),x._3)).sortBy(_._1).map(_._2).saveAsTextFile("real")

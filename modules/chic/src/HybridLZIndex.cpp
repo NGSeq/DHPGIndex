@@ -94,7 +94,11 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
 }
 
 void HybridLZIndex::Build() {
-  if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST ) {
+    try {
+
+
+
+    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST ) {
     special_separator = (uchar)'N';
   } else {
     if (lz_method == LZMethod::IN_MEMORY) {
@@ -120,6 +124,9 @@ void HybridLZIndex::Build() {
   if (verbose >= 2) {
     DetailedSpaceUssage();
   }
+    }catch(const char *e){
+        cout << "Exception: " << e << " "<< endl;
+    }
 }
 
 void HybridLZIndex::Indexing() {
@@ -305,8 +312,11 @@ void HybridLZIndex::Kernelize() {
     cout << "Kernel text length n : " << kernel_text_len << endl;
     cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
   }
+    try {
 
-  uint64_t *tmp_limits_kernel;
+
+        fprintf(stdout, " HERE 1");
+    uint64_t *tmp_limits_kernel;
   uchar *kernel_text;
 
   long t1 = Utils::wclock();
@@ -324,7 +334,7 @@ void HybridLZIndex::Kernelize() {
     }
   }
 
-
+        fprintf(stdout, " HERE 2");
   MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
   long t2 = Utils::wclock();
   cout << "MakeKernelString: "<< (t2-t1) << " seconds. " << endl;
@@ -368,6 +378,9 @@ void HybridLZIndex::Kernelize() {
 
   index_size_in_bytes += kernel_manager->GetSizeBytes();
   // ASSERT(kernel_text_len == kernel_manager->GetLength());
+    }catch(const char *e){
+        cout << "Exception: " << e << " "<< endl;
+    }
 }
 
 // Assumes that the resulting kernel string fits in main memory.
@@ -485,7 +498,11 @@ void HybridLZIndex::EncodeKernelLimitsAndSuccessor(uint64_t * tmp_limits_kernel)
 }
 
 void HybridLZIndex::ComputeKernelTextLen() {
-  uint64_t l, r;
+    try {
+
+
+
+    uint64_t l, r;
   kernel_text_len = l = 0;
   for (size_t i = 0; i< n_phrases; i++) {
     if (i+1 < n_phrases) {
@@ -503,6 +520,9 @@ void HybridLZIndex::ComputeKernelTextLen() {
     }
     l =r;
   }
+    }catch(const char *e){
+        cout << "Exception: " << e << " "<< endl;
+    }
 }
 
 void HybridLZIndex::SetFileNames() {
@@ -1219,10 +1239,13 @@ void HybridLZIndex::FindPrimaryOccsFQ2(vector<Occurrence> * ans,
                                       vector<string> kernel_options) const {
   bool retrieve_all = (secondary_report == SecondaryReportType::ALL);
 
-  vector<Occurrence> locations = KernelManagerBWA::SamOccurrences(alignment_filename);
+  vector<Occurrence> locations;
+  if(kernel_type==KernelType::BLAST)
+      locations = KernelManagerBLAST::SamOccurrences(alignment_filename);
+  else
+      locations = KernelManagerBWA::SamOccurrences(alignment_filename);
 
-
-  size_t all_occs_in_kernel = locations.size();
+      size_t all_occs_in_kernel = locations.size();
   if (verbose >= 2) {
     cout << "Occurrences mapped to kernel: " << all_occs_in_kernel << endl;
   }

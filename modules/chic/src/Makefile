@@ -7,7 +7,7 @@ include ../ext/sdsl-lite-2.1.1/Make.helper
 PARANOID=-pedantic -Wall -Wextra -Wcast-align -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wlogical-op -Wmissing-declarations -Wmissing-include-dirs -Wnoexcept -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-null-sentinel  -Wswitch-default -Wundef -Werror -Winline -Wno-error=unused-parameter -Wno-error=unused-variable
 
 #CXX_FLAGS= -std=c++11 -Wall -Wextra -O0 -ggdb -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
-CXX_FLAGS= -std=c++11 -pthread -Wall -Wextra  -O9 -DNDEBUG -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
+CXX_FLAGS= -g3 -std=c++11 -pthread -Wall -Wextra  -O9 -DNDEBUG -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
 
 INCLUDES=-isystem$(INC_DIR)
 LIB=$(LIB_DIR)/libsdsl.a $(LIB_DIR)/libdivsufsort.a $(LIB_DIR)/libdivsufsort64.a /usr/hdp/3.1.0.0-78/hadoop/lib/native/libhdfs.a /usr/lib/jvm/java-1.8.0-openjdk/jre/lib/amd64/server/libjvm.so -lz

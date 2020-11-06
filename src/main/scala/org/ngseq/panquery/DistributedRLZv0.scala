@@ -1,6 +1,6 @@
 package org.ngseq.panquery
 
-import java.io._
+import java.io.{BufferedOutputStream, File, FileOutputStream, PrintWriter}
 import java.nio.ByteBuffer
 
 import org.apache.spark.broadcast.Broadcast
@@ -8,8 +8,8 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.input_file_name
 
 import scala.collection.mutable.ArrayBuffer
-import scala.sys.process._
-import scala.util.control.Breaks._
+import scala.sys.process.Process
+import scala.util.control.Breaks.{break, breakable}
 
 object DistributedRLZv0 {
 

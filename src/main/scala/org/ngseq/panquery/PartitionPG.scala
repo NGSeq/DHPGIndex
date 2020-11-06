@@ -1,11 +1,13 @@
+package org.ngseq.panquery
+
 import java.io.IOException
 import java.net.URI
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.spark.sql.SparkSession
-import scala.collection.mutable.ArrayBuffer
 
+import scala.collection.mutable.ArrayBuffer
 
 object PartitionPG {
 

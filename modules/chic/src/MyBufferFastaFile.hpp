@@ -13,6 +13,10 @@ using FMD::FastaMetaData;
 class MyBufferFastaFile : public MyBuffer{
  public:
   MyBufferFastaFile(char * filename) {
+      try {
+
+
+
       fprintf(stdout, " FASTA");
 
       metadata = new FastaMetaData();
@@ -23,6 +27,9 @@ class MyBufferFastaFile : public MyBuffer{
     seq_i = 0;
     file_i = metadata->SeqposToFilepos(0);
     fs.seekg((int64_t)file_i);
+      }catch(const char *e){
+          cout << "Exception: " << e << " "<< endl;
+      }
   }
 
   bool AmGood() {

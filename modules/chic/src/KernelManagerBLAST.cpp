@@ -39,7 +39,7 @@ KernelManagerBLAST::KernelManagerBLAST(uchar * input_kernel_text,
   bt2_command_index += " " + kernel_text_filename;
   //bt2_command_index += " -blastdb_version 5 ";
   bt2_command_index += " -dbtype nucl ";
-  bt2_command_index += " -max_file_sz 2000000000 ";
+  bt2_command_index += " -max_file_sz 4000000000 ";
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
 
   if (verbose > 1) {
@@ -80,7 +80,7 @@ KernelManagerBLAST::KernelManagerBLAST(char * _kernel_text_filename,
   bt2_command_index += " " + kernel_text_filename;
   //bt2_command_index += " -blastdb_version 5 ";
   bt2_command_index += " -dbtype nucl ";
-  bt2_command_index += " -max_file_sz 2000000000 ";
+  bt2_command_index += " -max_file_sz 4000000000 ";
   bt2_command_index += " > " + kernel_text_filename + ".log 2>&1";
 
   if (verbose > 1) {
@@ -143,7 +143,9 @@ vector<Occurrence>  KernelManagerBLAST::LocateOccsFQ(char * query_filename,
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
   exit(-1);
 #else
-  string  tmp_out_filename = "./aligned_to_kernel.blast";  // TODO: a better name ?
+  std::string basefn = kernel_text_filename.substr(kernel_text_filename.find_last_of("/\\") + 1);
+
+  string  tmp_out_filename = "./aligned_to_kernel_"+basefn+".blast";  // TODO: a better name ?
   string bt2_command_align;
   string all_flags;
 
