@@ -32,7 +32,7 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
   this->verbose = parameters->verbose;
   //ValidateParams(parameters);
   this->lz_method = parameters->lz_method;
-  if (lz_method == LZMethod::IN_MEMORY) {
+  /*if (lz_method == LZMethod::IN_MEMORY) {
     // Only case when we can assume everything will fit in memory...
     uchar * _seq;
     size_t _len;
@@ -45,7 +45,7 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
     this->text_len = _len;
     this->text_filename = parameters->input_filename;
     //if (_max_memory_MB == 0) _max_memory_MB = 100;
-  } else {
+  } else {*/
     this->book_keeper = new BookKeeper(parameters->input_filename,
                                        parameters->kernel_type,
                                        verbose);
@@ -57,7 +57,9 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
     
     this->tmp_seq = NULL;
     //ASSERT(parameters->max_memory_MB > 0);
-  }
+  //}
+    cout << "parameters->input_lz_filename   : " << parameters->input_lz_filename << endl;
+    cout << "Indexing only   : " << parameters->indexingonly << endl;
   this->input_lz_filename = parameters->input_lz_filename;
 
   index_size_in_bytes = 0;
@@ -139,9 +141,11 @@ void HybridLZIndex::Indexing() {
             ChooseSpecialSeparator(text_filename);
         }
     }
-
+    cout << "Indexing only. Reading LZ parse.." << endl;
     vector<pair<uint64_t, uint64_t> > lz_phrases;
-    LempelZivParser::GetLZPhrases(&lz_phrases, this);
+    //LempelZivParser::GetLZPhrases(&lz_phrases, this);
+    FILE * lz_infile  = Utils::OpenReadOrDie(GetInputLZFilename());
+    LempelZivParser::LoadLZParse(lz_infile, &lz_phrases);
     n_phrases = lz_phrases.size();
     tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
     tsrr->SetFileNames(index_prefix);
@@ -826,6 +830,9 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
 
   load_from_file(limits_kernel, limits_kernel_filename);
   load_from_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
+    for (size_t i = 0; i < sparse_sample_limits_kernel.size(); i++) {
+        cout << sparse_sample_limits_kernel[i] << endl;
+    }
 
   tsrr = new RangeReporting();
   tsrr->Load(_prefix, _verbose);
@@ -950,7 +957,6 @@ void HybridLZIndex::FindFQ(char * query_filename,
   my_out << "@PG\tID:CHIC\tVN:0.1" << endl;
 
   for (size_t i = 0; i < my_occs.size(); i++) {
-
     book_keeper->NormalizeOutput(my_occs[i], kernel_type);
     my_out << my_occs[i].GetMessage() << endl;
   }

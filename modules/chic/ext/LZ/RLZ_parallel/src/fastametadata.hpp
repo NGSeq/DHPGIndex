@@ -33,7 +33,7 @@ class FastaMetaData {
  public:
   FastaMetaData() {
   }
-  FastaMetaData(string _fasta_filename, bool verbose=false) {
+  FastaMetaData(string _fasta_filename, bool verbose=true) {
     cache_i = 0;
     fasta_filename.assign(_fasta_filename);
     meta_filename = fasta_filename + ".metadata";

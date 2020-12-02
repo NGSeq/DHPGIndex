@@ -12,7 +12,6 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable.ArrayBuffer
-import scala.sys.process.Process
 import scala.util.control.Breaks._
 
 object DistributedRLZFasta {
@@ -54,114 +53,24 @@ object DistributedRLZFasta {
     println("Started distributed RLZ")
     splitted.foreach{group=>
 
-      val refarr = group._2.toArray
-      val r = new scala.util.Random()
-      var refs = ArrayBuffer[(String)]()
-      for (i <- 0 to refsize-1){
-        val rand = r.nextInt(refarr.length-1)
-        println("RANDOM SAMPLE: "+rand)
-        println(refarr(rand)._1)
-        refs.append(refarr(rand)._3)
-      }
+      val refs = group._2.take(refsize).map(s=>s._3).mkString
+      val reflength = refs.length
 
-      val reffile = "/mnt/tmp/ref"+chr+"_"+group._1
-      val pw = new PrintWriter(new File(reffile))
-      refs.foreach(x => pw.write(x))
-      pw.close()
+      val sar = new SAR()
+      val SA = sar.suffixArray(refs)
 
-      val ref = scala.io.Source.fromFile(reffile).getLines().mkString
-      val reflength = ref.length
-      var radixparams = ""
-      if(reflength>800000000)
-        radixparams = "-w "
-      val radixout = localOut+"_"+group._1
-      println("Creating Suffix Array from reference sequence of length" +reflength)
-      val createSA = Process(radixSA + " "+radixparams+" "+reffile+" " + radixout).!
-      /*
-      println("removing radix")
-      val removed = new File(localOut).delete()*/
-
-
-      val sa1 = ArrayBuffer[(String)]()
-      val sa2 = ArrayBuffer[(String)]()
-      val sa3 = ArrayBuffer[(String)]()
-      val sa4 = ArrayBuffer[(String)]()
-      val sa5 = ArrayBuffer[(String)]()
-      val sa6 = ArrayBuffer[(String)]()
-      val sa7 = ArrayBuffer[(String)]()
-      val sa8 = ArrayBuffer[(String)]()
-      val sa9 = ArrayBuffer[(String)]()
-      val sa10 = ArrayBuffer[(String)]()
-      val sa11 = ArrayBuffer[(String)]()
-      val sa12 = ArrayBuffer[(String)]()
-      val sa13 = ArrayBuffer[(String)]()
-      val sa14 = ArrayBuffer[(String)]()
-      val sa15 = ArrayBuffer[(String)]()
-      val sa16 = ArrayBuffer[(String)]()
-
-      val is = scala.io.Source.fromFile(radixout).getLines()
-
-      //val sar = new SAR()
-      //val SA = sar.suffixArray(ref)
-
-      val chunksize = (reflength/sasplitsize)+1
-      println("Splitting Suffix Array to " +sasplitsize+" chunks of size "+chunksize)
-      for(i <- 0 to sasplitsize-1){
-
-        i match {
-          case 0  => sa1.appendAll(is.slice(0,chunksize).toTraversable)
-          case 1  => sa2.appendAll(is.slice(0,chunksize).toTraversable)
-          case 2  => sa3.appendAll(is.slice(0,chunksize).toTraversable)
-          case 3  => sa4.appendAll(is.slice(0,chunksize).toTraversable)
-          case 4  => sa5.appendAll(is.slice(0,chunksize).toTraversable)
-          case 5  => sa6.appendAll(is.slice(0,chunksize).toTraversable)
-          case 6  => sa7.appendAll(is.slice(0,chunksize).toTraversable)
-          case 7  => sa8.appendAll(is.slice(0,chunksize).toTraversable)
-          case 8  => sa9.appendAll(is.slice(0,chunksize).toTraversable)
-          case 9  => sa10.appendAll(is.slice(0,chunksize).toTraversable)
-          case 10  => sa11.appendAll(is.slice(0,chunksize).toTraversable)
-          case 11  => sa12.appendAll(is.slice(0,chunksize).toTraversable)
-          case 12  => sa13.appendAll(is.slice(0,chunksize).toTraversable)
-          case 13  => sa14.appendAll(is.slice(0,chunksize).toTraversable)
-          case 14  => sa15.appendAll(is.slice(0,chunksize).toTraversable)
-          case 15  => sa16.appendAll(is.slice(0,chunksize).toTraversable)
-          // catch the default with a variable so you can print it
-          case default  => ArrayBuffer[(String)]()
-        }
-
-      }
 
     def getsuf(lb: Int) : Int = {
 
-      val chunk = lb/(sa1.length)
-      chunk match {
-        case 0  => return sa1(lb-chunk*sa1.length).toInt
-        case 1  => return sa2(lb-chunk*sa1.length).toInt
-        case 2  => return sa3(lb-chunk*sa1.length).toInt
-        case 3  => return sa4(lb-chunk*sa1.length).toInt
-        case 4  => return sa5(lb-chunk*sa1.length).toInt
-        case 5  => return sa6(lb-chunk*sa1.length).toInt
-        case 6  => return sa7(lb-chunk*sa1.length).toInt
-        case 7  => return sa8(lb-chunk*sa1.length).toInt
-        case 8  => return sa9(lb-chunk*sa1.length).toInt
-        case 9  => return sa10(lb-chunk*sa1.length).toInt
-        case 10  => return sa11(lb-chunk*sa1.length).toInt
-        case 11  => return sa12(lb-chunk*sa1.length).toInt
-        case 12  => return sa13(lb-chunk*sa1.length).toInt
-        case 13  => return sa14(lb-chunk*sa1.length).toInt
-        case 14  => return sa15(lb-chunk*sa1.length).toInt
-        case 15  => return sa16(lb-chunk*sa1.length).toInt
-        // catch the default with a variable so you can print it
-        case default  => return 0
-      }
+      SA(lb)
 
     }
 
     def getref(lb: Int) : Char = {
 
-      if(lb>=ref.length)
+      if(lb>=refs.length)
         return "N"(0)
-      ref(lb)
+      refs(lb)
 
     }
 
@@ -305,39 +214,51 @@ object DistributedRLZFasta {
     //var sampleid = 0
     group._2.foreach{sample =>
       //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
-      val encodings = encode(sample._3)
+
 
       var fos: FSDataOutputStream = null
       val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
-      try {
-        val nf = new DecimalFormat("#0000")
-        val fname = sample._1+"_"+nf.format(group._1)+"."+chr //.toString.split("/")
+      val nf = new DecimalFormat("#0000")
+      val fname = sample._1+"_"+nf.format(group._1)+"."+chr //.toString.split("/")
 
-        fos = fis.create(new Path(hdfsout+"/" + fname))
-      } catch {
-        case e: IOException =>
-        //e.printStackTrace()
+      val exists = fis.exists(new Path(hdfsout+"/" + fname))
+      if(exists){
+        println("File" +fname+ " exists!")
+      }else{
+        try {
+
+          fos = fis.create(new Path(hdfsout+"/" + fname))
+
+        } catch {
+          case e: IOException =>
+            e.printStackTrace()
+        }
+
+        val encodings = encode(sample._3)
+
+        encodings.foreach{z =>
+          var posBytes: Array[Byte] = null
+
+          val len = z._2
+          if(len != 0) {
+            posBytes = ByteBuffer.allocate(8).putLong(z._1.toLong).array.reverse
+          }
+          else {
+            posBytes = ByteBuffer.allocate(8).putLong(z._1(0).toLong).array.reverse
+          }
+          val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
+
+          fos.write(posBytes)
+          fos.write(lenBytes)
+        }
+        fos.close()
       }
 
-      encodings.foreach{z =>
-        var posBytes: Array[Byte] = null
-
-        val len = z._2
-        if(len != 0) {
-          posBytes = ByteBuffer.allocate(8).putLong(z._1.toLong).array.reverse
-        }
-        else {
-          posBytes = ByteBuffer.allocate(8).putLong(z._1(0).toLong).array.reverse
-        }
-        val lenBytes = ByteBuffer.allocate(8).putLong(len).array.reverse
-
-        fos.write(posBytes)
-        fos.write(lenBytes)
-      }
-      fos.close()
 
       //sampleid+=1
     }
+
+
     }
 
     spark.stop()

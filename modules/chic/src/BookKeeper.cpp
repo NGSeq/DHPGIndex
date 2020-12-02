@@ -79,7 +79,7 @@ void BookKeeper::CreateMetaDataHDFS(char * filename) {
 
 void BookKeeper::CreateMetaData(char * filename) {
   FastaMetaData *metadata;
-  metadata = new FastaMetaData(string(filename));
+  metadata = new FastaMetaData(string(filename), true);
   metadata->Save();
   
   n_seqs = metadata->GetNSeqs();
