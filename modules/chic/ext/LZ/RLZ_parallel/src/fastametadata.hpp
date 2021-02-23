@@ -38,13 +38,12 @@ class FastaMetaData {
     fasta_filename.assign(_fasta_filename);
     meta_filename = fasta_filename + ".metadata";
     if (FileExists(meta_filename)) {
-      if (verbose)
-        cout << "Metadata file exists, will load it" << endl;
+        fprintf(stdout, " Metadata file exists, will load it");
       Load(meta_filename);
       return;
     }
     if (verbose)
-      cout << "metadata construction..." << endl;
+      fprintf(stdout, " metadata construction...");
     std::ifstream fs;
     fs.open(fasta_filename);
     if(fs.fail()) {
@@ -191,28 +190,36 @@ class FastaMetaData {
     fclose(fp);
   }
 
-  void Load(string _meta_filename) {
-    // cout << "Loading..." << endl;
-    cache_i = 0;
-    meta_filename.assign(_meta_filename);
+  void Load(string mf) {
+
+      cout << " Loading metadata from file " << mf << endl;
+
+      cache_i = 0;
+    //meta_filename.assign(_meta_filename);
     n_seqs = 0;
-    FILE * fp = fopen(meta_filename.c_str(), "r");
+    FILE * fp = fopen(mf.c_str(), "r");
     if (!fp) {
-      cerr << meta_filename << " cannot be open for loading, aborting." << endl;
+      cerr << mf << " cannot be open for loading, aborting." << endl;
       exit(EXIT_FAILURE);
     }
+      fprintf(stdout, " Metadata file opened..");
+
     if (1 != fread(&file_len, sizeof(file_len), 1, fp)) {
       cout << stderr << "Error reading file_len from file" << endl;
       exit(1);
     }
+
+   fprintf(stdout, " 1 ");
     if (1 != fread(&line_len, sizeof(line_len), 1, fp)) {
       cout << stderr << "Error reading line_len from file" << endl;
       exit(1);
     }
+    fprintf(stdout, " 2 ");
     if (1 != fread(&n_seqs, sizeof(n_seqs), 1, fp)) {
       cout << stderr << "Error reading n_seqs from file" << endl;
       exit(1);
     }
+    fprintf(stdout, " 3 ");
     seq_lengths.clear();
     seq_lengths.reserve(n_seqs);
     for (size_t i = 0; i < n_seqs; i++) {
@@ -223,7 +230,7 @@ class FastaMetaData {
       }
       seq_lengths.push_back(tmp);
     }
-
+   fprintf(stdout, " 4 ");
     headers_sp.clear();
     headers_sp.reserve(n_seqs);
     for (size_t i = 0; i < n_seqs; i++) {
@@ -234,7 +241,7 @@ class FastaMetaData {
       }
       headers_sp.push_back(tmp);
     }
-
+fprintf(stdout, " 5 ");
     headers_ep.clear();
     headers_ep.reserve(n_seqs);
     for (size_t i = 0; i < n_seqs; i++) {
@@ -245,7 +252,7 @@ class FastaMetaData {
       }
       headers_ep.push_back(tmp);
     }
-
+fprintf(stdout, " 6 ");
     seq_names.clear();
     seq_names.reserve(n_seqs);
     for (size_t i = 0; i < n_seqs; i++) {
@@ -261,6 +268,8 @@ class FastaMetaData {
       }
       seq_names.push_back(tmp_content);
     }
+    fprintf(stdout, " Loaded metadata..");
+
     fclose(fp);
     BuildSeqLengthsSums();
   }
@@ -331,7 +340,9 @@ class FastaMetaData {
   }
   
   void BuildSeqLengthsSums() {
-    seq_lengths_sums.clear();;
+  fprintf(stdout, " BuildSeqLengthsSums");
+
+    seq_lengths_sums.clear();
     seq_lengths_sums.reserve(n_seqs+1);
     size_t sum = 0;
     seq_lengths_sums.push_back(sum);
@@ -339,6 +350,7 @@ class FastaMetaData {
       sum+=seq_lengths[i];
       seq_lengths_sums.push_back(sum);
     }
+    fprintf(stdout, "Done BuildSeqLengthsSums");
   }
 
   virtual ~FastaMetaData() {

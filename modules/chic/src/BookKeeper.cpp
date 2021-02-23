@@ -24,9 +24,11 @@ BookKeeper::BookKeeper(char * input_filename,
   this->verbose = _verbose;
   if (kernel_type == KernelType::FMI) {
     n_seqs = 0;  // TODO: if we want FMI to handle many files
+      fprintf(stdout, " FMI");
     total_length = Utils::GetLength(input_filename);
     // we should do something here. Otherwise, it is irrelevant.
   } else if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST) {
+      fprintf(stdout, " CreateMetaData");
     CreateMetaData(input_filename);
     //CreateMetaDataHDFS(input_filename);
   } else {
@@ -79,7 +81,9 @@ void BookKeeper::CreateMetaDataHDFS(char * filename) {
 
 void BookKeeper::CreateMetaData(char * filename) {
   FastaMetaData *metadata;
+    fprintf(stdout, " 1..");
   metadata = new FastaMetaData(string(filename), true);
+    fprintf(stdout, " 2..");
   metadata->Save();
   
   n_seqs = metadata->GetNSeqs();
@@ -89,7 +93,7 @@ void BookKeeper::CreateMetaData(char * filename) {
   
   seq_names.clear();
   seq_names.reserve(n_seqs);
-  
+    fprintf(stdout, " 3..");
   vector<size_t> * ptr_lengths = metadata->AccessSeqLengths();
   vector<string> * ptr_names = metadata->AccessSeqNames();
   total_length = 0;

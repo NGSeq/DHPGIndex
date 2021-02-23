@@ -39,6 +39,9 @@ clean:
 	@echo " [CLN] Removing object files"
 	@rm -f $(OBJECTS) $(CHICA_BINS) $(CHICO_BINS) endmap
 
+merge_lim: merge_lim.cpp $(OBJECTS)
+	$(MY_CXX) $(CXX_FLAGS) $(INCLUDES)-o merge_lim merge_lim.cpp utils.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
+
 build_index: build_index.cpp $(OBJECTS)
 	@echo " [BLD] Building build_index"
 	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o build_index build_index.cpp $(LZ_FILES) $(OBJECTS) $(LIB)

@@ -1,4 +1,4 @@
-all: externals index test_data
+all: externals index
 
 
 externals:
@@ -8,8 +8,8 @@ externals:
 index:
 	@cd src;make;cd ..;
 
-test_data:
-	@cd test_scripts;make data;cd ..;
+#test_data:
+#	@cd test_scripts;make data;cd ..;
 
 clean:
 	@ cd src;make clean;cd ..;

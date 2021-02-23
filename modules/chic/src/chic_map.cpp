@@ -82,192 +82,99 @@ void Success() {
 
 vector<string> LoadPatterns(char * filename, uint max_query_len);
 
-int main(int argc, char *argv[]) {
-  Parameters * parameters  = new Parameters();
-  // default values:
-  parameters->input_type = InputType::FQ;
-  parameters->output_filename = NULL;
-  parameters->verbose = 1;
-  parameters->secondary_report = SecondaryReportType::NONE;
-  parameters->n_threads = 1;
-  parameters->interleaved_mates = false;
+int main(int argc, char **argv) {
 
-  while (1) {
-    static struct option long_options[] = {
-      /* These options don’t set a flag.
-         We distinguish them by their indices. */
-      {"output",    required_argument, 0, 'o'},
-      {"secondary_report", required_argument, 0, 's'},
-      {"threads",    required_argument, 0, 't'},
-      {"verbose",    required_argument, 0, 'v'},
-      {"interleaved-reads",    no_argument, 0, 'p'},
-      {"kernel-options", required_argument, 0, 'K'},
-      {"help",    no_argument, 0, 'h'},
-      {0, 0, 0, 0}
-    };
-    /* getopt_long stores the option index here. */
-    int option_index = 0;
 
-    int c = getopt_long(argc, argv, "o:s:t:v:p:K:h", long_options, &option_index);
+    if (argc < 3) {
+        fprintf(stderr, "%s <infile1> <infile2> ... <infileN> \n\n"
+                        "It merges the metadata parsings of infile1 to infileN, correcting by adding the cumulated offset. Output is written to merged.meta\n", argv[0]);
+        std::exit(EXIT_FAILURE);
+    }
 
-    /* Detect the end of the options. */
-    if (c == -1)
-      break;
+    int n_files = argc - 1;
 
-      switch (c) {
-      case 0:
+    int opt = atoi(argv[1]);
 
-            /* If this option set a flag, do nothing else now. */
-        if (long_options[option_index].flag != 0)
-          break;
-        printf("option %s", long_options[option_index].name);
-        if (optarg)
-          printf(" with arg %s", optarg);
-        printf("\n");
-        break;
+    if(opt==0) {
 
-      case 'h':
-        print_help();
-        delete (parameters);
-        exit(0);
-        break;
-
-      case 'p':
-        parameters->interleaved_mates = true;
-        break;
-
-      case 'o':
-        parameters->output_filename = optarg;
-        break;
-
-      case 's':
-        if (strcmp(optarg, "ALL") == 0) {
-          parameters->secondary_report = SecondaryReportType::ALL;
-        } else if (strcmp(optarg, "LZ") == 0) {
-          parameters->secondary_report = SecondaryReportType::LZ;;
-        } else if (strcmp(optarg, "NONE") == 0) {
-          parameters->secondary_report = SecondaryReportType::NONE;;
-        } else {
-          print_help();
-          suggest_help(argv);
-          delete (parameters);
-          exit(-1);
+        size_t lsize = 0;
+        for (int file_id = 2; file_id <= n_files; file_id++) {
+            enc_vector<elias_delta, REGULAR_DENS> lk;
+            load_from_file(lk, argv[file_id]);
+            lsize += lk.size();
         }
-        break;
-      
-      case 'K':
-        parameters->kernel_options.push_back(std::string(optarg));
-        break;
+        cout << "totlsize " << lsize << endl;
+        int_vector<> tmp_limits_int_vector(lsize);
 
-      case 't':
-        parameters->n_threads = atoi(optarg);
-        break;
+        uint64_t offset = 0;
+        for (int file_id = 2; file_id <= n_files; file_id++) {
+            //uint64_t byte_len = utils::file_size(argv[file_id]);
 
-      case 'v':
-        parameters->verbose = atoi(optarg);
-        break;
+            enc_vector<elias_delta, REGULAR_DENS> limits_kernel;
 
-      case '?':
-        /* getopt_long already printed an error message. */
-        suggest_help(argv);
-        exit(-1);
-        break;
+            load_from_file(limits_kernel, argv[file_id]);
 
-      default:
-        suggest_help(argv);
-        exit(-1);
+            //size_t seq_len = byte_len;
+            //FILE * fp = std::fopen(argv[file_id], "r");
+
+            uint64_t last = 0;
+            size_t s = limits_kernel.size();
+            cout << "lsize " << s << endl;
+
+            size_t i = 0;
+            for (i = 0; i < s; i++) {
+                //cout << i << "=i " <<endl;
+                //cout << limits_kernel[i] << endl;
+                if (file_id == 3 && last == 0)
+                    cout << "skip first " << endl;
+                else tmp_limits_int_vector[i] = limits_kernel[i] + offset;
+                last = limits_kernel[i];
+            }
+            offset += last;
+
+            size_t ofs = offset;
+            cout << "offs " << ofs << endl;
+
+        }
+
+        store_to_file(enc_vector<elias_delta, REGULAR_DENS>(tmp_limits_int_vector), "merged.limits_kernel");
+    }else{
+        size_t lsize = 0;
+        size_t sparse_sample_ratio = 512;
+
+        enc_vector<elias_delta, REGULAR_DENS> lk;
+            load_from_file(lk, argv[2]);
+            size_t nphrases = lk.size();
+
+        cout << "nPhrases " << nphrases << endl;
+
+        size_t sparse_sample_limits_kernel_len = (nphrases)/sparse_sample_ratio;
+        if ((nphrases)%sparse_sample_ratio)
+            sparse_sample_limits_kernel_len++;
+        vector<uint64_t> tmp_limits_int_vector = vector<uint64_t>(sparse_sample_limits_kernel_len);
+
+            //uint64_t byte_len = utils::file_size(argv[file_id]);
+
+            //size_t seq_len = byte_len;
+            //FILE * fp = std::fopen(argv[file_id], "r");
+
+            uint64_t posFil = 0;
+            uint64_t countSMSucc = 0;
+
+            for (size_t i = 0; i < nphrases; i++) {
+                posFil = lk[i];
+                if (i%sparse_sample_ratio == 0) {
+                    //cout << "nf " << posFil << endl;
+                    tmp_limits_int_vector[countSMSucc] = posFil;
+                    countSMSucc++;
+                }
+                //tmp_limits_int_vector[i] = tmp_limits_kernel[i];
+            }
+
+
+        store_to_file(tmp_limits_int_vector, "merged.sparse_limits_kernel");
     }
-  }
 
-    int rest = argc - optind;
-    if (rest != 1 && rest != 2) {
-      cout << "Incorrect number of arguments." << endl;
-      suggest_help(argv);
-      exit(-1);
-    }
-  parameters->index_basename = argv[optind];
-  parameters->alignment_filename= argv[optind + 1];
-
-  //////////////////////////////////////
-  // TODO: Sanitize parameters: e,g, -output=file.out
-  // fails... it should be --output=file.out
-  // or -o file.out
-  ///////////////////////////////////////
-  long double t1, t2;
-
-  t1 = Utils::wclock();
-
-  HybridLZIndex * my_index = new HybridLZIndex();
-  my_index->Load(parameters->index_basename,
-                 parameters->n_threads,
-                 parameters->verbose);
-
-  //cout << "LZ Index succesfully load" << endl;
-  ///////////////////////////////////////////////////
-  // FROM HERE ON START ACTING ACCORDING TO PARAMS:
-  ///////////////////////////////////////////////////
-  if (parameters->output_filename == NULL) {
-    my_index->FindFQ2(parameters->alignment_filename,
-                     parameters->interleaved_mates,
-                     parameters->secondary_report,
-                     parameters->kernel_options,
-                     cout);
-  } else {
-    std::ofstream my_out;
-    my_out.open(parameters->output_filename);
-    ASSERT(my_out.is_open());
-    ASSERT(my_out.good());
-    // TODO: pass parameters ?
-    my_index->FindFQ2(parameters->alignment_filename,
-                     parameters->interleaved_mates,
-                     parameters->secondary_report,
-                     parameters->kernel_options,
-                     my_out);
-    my_out.close();
-  }
-  
-  t2 = Utils::wclock();
-  /*cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cout << "Reads aligned in: "<< (t2-t1) << " seconds. " << endl;
-  if (t2-t1 > 60) {
-    cout << "Reads aligned in: "<< (t2-t1)/60 << " minutes. " << endl;
-  }
-  if (t2-t1 > 3600) {
-    cout << "Reads aligned in: "<< (t2-t1)/3600 << " hours. " << endl;
-  }
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-*/
-  delete(my_index);
-  delete(parameters);
-  return 0;
 }
 
-void ValidatePatterns(vector<string> patterns, size_t max_len) {
-  // TODO: this code should be compiled conditionally, perhaps using DNDEBUG
-  for (size_t i = 0; i < patterns.size(); i++) {
-    if (patterns[i].size() > max_len) {
-      cerr << "Patterns are larger than the index limit:" << endl;
-      cerr << "Limit: " << max_len << endl;
-      cerr << "Offending pattern:" << patterns[i] << endl;
 
-      exit(EXIT_FAILURE);
-    }
-  }
-}
-
-vector<string> LoadPatterns(char * filename, uint max_query_len) {
-  ifstream ifile;
-  ifile.open(filename);
-  if (!ifile.good() || !ifile.is_open()) {
-    cerr << "Error loading patterns from '" << filename << "'" << endl;
-    exit(EXIT_FAILURE);
-  }
-  string line;
-  vector<string> data;
-  while (getline(ifile, line)) {
-    data.push_back(line);
-  }
-  ValidatePatterns(data, max_query_len);
-  //cout << data.size() << " patterns succesfully loaded from "<< filename << endl;
-  return data;
-}

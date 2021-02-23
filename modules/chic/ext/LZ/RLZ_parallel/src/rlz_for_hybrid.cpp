@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
 
   char * reference_filename = argv[1];
   size_t reference_len = 1024*1024*(size_t)atoi(argv[2]);
-  char * input_filename = argv[3];
+  char * ls -lhtr = argv[3];
   char * output_filename = argv[4];
   size_t n_partitions = (size_t)atoi(argv[5]);
   size_t RLZ_THREADS = (size_t)atoi(argv[6]);

@@ -208,15 +208,16 @@ int main(int argc, char **argv) {
   index->Save();
   t2 = Utils::wclock();
 
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cout << "Index succesfully built in: "<< (t2-t1) << " seconds. " << endl;
+    fprintf(stdout, " ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+    fprintf(stdout, "Index succesfully built in: %d seconds", (t2-t1) );
+
   if (t2-t1 > 60) {
     cout << "Index succesfully built in: "<< (t2-t1)/60 << " minutes. " << endl;
   }
   if (t2-t1 > 3600) {
     cout << "Index succesfully built in: "<< (t2-t1)/3600 << " hours. " << endl;
   }
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+    fprintf(stdout, " ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
   delete(index);
   delete(parameters);
   exit(0);

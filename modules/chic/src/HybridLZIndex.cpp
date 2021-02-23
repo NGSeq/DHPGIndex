@@ -25,10 +25,12 @@ void HybridLZIndex::ValidateParams(BuildParameters * parameters) {
 }
 
 HybridLZIndex::HybridLZIndex() {
+    fprintf(stdout, " HLZ");
   this->index_size_in_bytes = 0;
 }
 
 HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
+    fprintf(stdout, " HLZ 0");
   this->verbose = parameters->verbose;
   //ValidateParams(parameters);
   this->lz_method = parameters->lz_method;
@@ -46,9 +48,11 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
     this->text_filename = parameters->input_filename;
     //if (_max_memory_MB == 0) _max_memory_MB = 100;
   } else {*/
+    fprintf(stdout, " HLZ 1");
     this->book_keeper = new BookKeeper(parameters->input_filename,
                                        parameters->kernel_type,
                                        verbose);
+    fprintf(stdout, " HLZ 2");
     //char * new_input_name = book_keeper->GetNewFileName();
     //this->text_filename = new_input_name;
     this->text_filename = parameters->input_filename;
@@ -58,8 +62,9 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
     this->tmp_seq = NULL;
     //ASSERT(parameters->max_memory_MB > 0);
   //}
-    cout << "parameters->input_lz_filename   : " << parameters->input_lz_filename << endl;
-    cout << "Indexing only   : " << parameters->indexingonly << endl;
+    fprintf(stdout, "LZ file %s",parameters->input_lz_filename);
+    fprintf(stdout, "Indexing only = %d", parameters->indexingonly);
+
   this->input_lz_filename = parameters->input_lz_filename;
 
   index_size_in_bytes = 0;
@@ -141,7 +146,8 @@ void HybridLZIndex::Indexing() {
             ChooseSpecialSeparator(text_filename);
         }
     }
-    cout << "Indexing only. Reading LZ parse.." << endl;
+
+    fprintf(stdout," ndexing only. Reading LZ parse..");
     vector<pair<uint64_t, uint64_t> > lz_phrases;
     //LempelZivParser::GetLZPhrases(&lz_phrases, this);
     FILE * lz_infile  = Utils::OpenReadOrDie(GetInputLZFilename());
@@ -149,11 +155,13 @@ void HybridLZIndex::Indexing() {
     n_phrases = lz_phrases.size();
     tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
     tsrr->SetFileNames(index_prefix);
+
     if (verbose >= 2)
-        cout << "Previous merge: " << n_phrases << " phrases." << endl;
+        fprintf(stdout," PHRASES Previous merge:: %d \\n", n_phrases );
     n_phrases = lz_phrases.size();
     if (verbose >= 2)
-        cout << "After merge: " << n_phrases << " phrases." << endl;
+        fprintf(stdout," After merge: %d \\n", n_phrases );
+
     index_size_in_bytes += tsrr->GetSizeBytes();
     IndexKernel();
     ComputeSize();
@@ -310,12 +318,12 @@ void HybridLZIndex::IndexKernel() {
 
 void HybridLZIndex::Kernelize() {
   ComputeKernelTextLen();
-  if (verbose) {
+
+    fprintf(stdout,"+++++++++++++++++++++++++++++++++++++++++++++");
+    fprintf(stdout, "Original length n    :  %lu", text_len);
+    fprintf(stdout, "Kernel text length n : %lu", kernel_text_len);
     cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
-    cout << "Original length n    : " << text_len << endl;
-    cout << "Kernel text length n : " << kernel_text_len << endl;
-    cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  }
+
     try {
 
 
@@ -394,13 +402,19 @@ void HybridLZIndex::MakeKernelString(MyBuffer * is,
                                      uchar ** kernel_ans,
                                      uint64_t ** tmp_limits_kernel_ans) {
   // Relies on GetLimit to navigate through the phrases.
+  //cout << "Allocate memory for kernel text of len:: " << kernel_text_len << endl;
   uchar *kernel_text;   // Filtered text
+
+  fprintf(stdout, "Allocate memory for kernel text of len ");
+    fprintf(stdout, "%lu", kernel_text_len);
+
   kernel_text = new uchar[kernel_text_len];
   uint64_t *tmp_limits_kernel = new uint64_t[n_phrases+1];
   uint64_t left, right, posFil;
   left = posFil = 0;
   for (size_t i = 0; i < n_phrases; i++) {
     tmp_limits_kernel[i] = posFil;
+    //fprintf(stdout, " limit kernel... ");
     if (verbose >= 3) {
       cout << "limit kernel: " << posFil << endl;
     }
@@ -505,7 +519,7 @@ void HybridLZIndex::ComputeKernelTextLen() {
     try {
 
 
-
+   fprintf(stdout,"PHRASES: %u",n_phrases);
     uint64_t l, r;
   kernel_text_len = l = 0;
   for (size_t i = 0; i< n_phrases; i++) {
@@ -523,9 +537,11 @@ void HybridLZIndex::ComputeKernelTextLen() {
         kernel_text_len += context_len + 2 + max_insertions;   // to copy current symbol + M + '$'= M+2
     }
     l =r;
+
   }
+  fprintf(stdout,"%lu ",kernel_text_len);
     }catch(const char *e){
-        cout << "Exception: " << e << " "<< endl;
+        fprintf(stdout,"Exception: %s",e);
     }
 }
 
@@ -834,6 +850,13 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
         cout << sparse_sample_limits_kernel[i] << endl;
     }
 
+    for (size_t i = 0; i < limits_kernel.size(); i++) {
+        cout << limits_kernel[i] << endl;
+    }
+    cout << "Limits kernel" <<  limits_kernel_filename << endl;
+    cout << "KernelLimits                      :" << sdsl::size_in_bytes(limits_kernel) << endl;
+    cout << "KernelLimits                      :" << limits_kernel.size() << endl;
+
   tsrr = new RangeReporting();
   tsrr->Load(_prefix, _verbose);
 
@@ -847,7 +870,7 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
       kernel_manager = new KernelManagerBLAST();
   }
   kernel_manager->Load(kernel_manager_prefix, n_threads, _verbose);
-  // ASSERT(kernel_text_len == kernel_manager->GetLength());
+  //ASSERT(kernel_text_len == kernel_manager->GetLength());
 
   book_keeper = new BookKeeper();
   book_keeper->Load(_prefix, _verbose);

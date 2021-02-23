@@ -53,7 +53,9 @@ object DistributedRLZFasta {
     println("Started distributed RLZ")
     splitted.foreach{group=>
 
-      val refs = group._2.take(refsize).map(s=>s._3).mkString
+      var refs = group._2.head._3.mkString
+
+      refs += group._2.take(refsize).map(s=>s._3).mkString
       val reflength = refs.length
 
       val sar = new SAR()
@@ -215,26 +217,26 @@ object DistributedRLZFasta {
     group._2.foreach{sample =>
       //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
 
-
-      var fos: FSDataOutputStream = null
-      val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
-      val nf = new DecimalFormat("#0000")
-      val fname = sample._1+"_"+nf.format(group._1)+"."+chr //.toString.split("/")
-
-      val exists = fis.exists(new Path(hdfsout+"/" + fname))
+      /*val exists = fis.exists(new Path(hdfsout+"/" + fname))
       if(exists){
         println("File" +fname+ " exists!")
-      }else{
-        try {
+      }else{*/
 
+        val encodings = encode(sample._3)
+
+        var fos: FSDataOutputStream = null
+        val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
+        val nf = new DecimalFormat("#0000")
+        val fname = sample._1+"_"+nf.format(group._1)+"."+chr //.toString.split("/")
+
+
+        try {
           fos = fis.create(new Path(hdfsout+"/" + fname))
 
         } catch {
           case e: IOException =>
             e.printStackTrace()
         }
-
-        val encodings = encode(sample._3)
 
         encodings.foreach{z =>
           var posBytes: Array[Byte] = null
@@ -252,16 +254,12 @@ object DistributedRLZFasta {
           fos.write(lenBytes)
         }
         fos.close()
-      }
-
-
-      //sampleid+=1
     }
 
 
     }
 
-    spark.stop()
+   spark.stop()
 
   }
 }

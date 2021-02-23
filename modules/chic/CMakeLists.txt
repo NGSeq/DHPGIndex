@@ -870,6 +870,7 @@ add_executable(chic
     src/chic_align.cpp
     src/chic_index.cpp
     src/chic_map.cpp
+    src/merge_lim.cpp
     src/fasta.cpp
     src/fasta.h
     src/HybridLZIndex.cpp
