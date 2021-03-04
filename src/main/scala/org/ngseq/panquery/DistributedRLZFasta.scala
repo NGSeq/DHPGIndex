@@ -26,12 +26,7 @@ object DistributedRLZFasta {
     val hdfsurl = args(2)
     val hdfsout = args(3)
     val refsize = args(4).toInt
-    val sasplitsize  = args(5).toInt
-    //val refsplitsize  = args(6).toInt
-    val chunks = args(6).toInt
-    val radixSA = "/opt/chic/radixSA"
-
-    val localOut = "/mnt/tmp/radixout."+chr
+    val chunks = args(5).toInt
 
     println("Load and preprocess pan-genome")
     spark.sparkContext.hadoopConfiguration.set("textinputformat.record.delimiter",">")
@@ -49,7 +44,7 @@ object DistributedRLZFasta {
 
      }.groupBy(g => g._4)
 
-    println("Divided pan-genome to "+splitted.getNumPartitions+" groups")
+    println("Divided pan-genome to "+splitted.getNumPartitions+" partitions")
     println("Started distributed RLZ")
     splitted.foreach{group=>
 
@@ -76,9 +71,6 @@ object DistributedRLZFasta {
 
     }
 
-
-    //val d = "cabbaabba"
-    //val x = "ncabbaaabbaaa"
 
     // binary search that can find the upper and lower bounds
     // e.g for string 1111222555555666677 would return
@@ -141,29 +133,22 @@ object DistributedRLZFasta {
       Some((low_res, low))
     }
 
-    // check newline to deal with partition borders (stop phrase search if goes
-    // to newline
     def factor(i: Int, x: String): (String, Long) = {
 
       var lb = 0
-      var rb = reflength-1 // check suffix array size
+      var rb = reflength-1
       var j = i
       breakable {
         while (j < x.length()) {
-          //println("j: " + j + " SA.value: " + SA.value(lb))
-          //println((SA.value(lb)+j-i) + " " + d.length())
+
           if (lb == rb && getref(getsuf(lb) + j - i) != x(j)) {
             break
           }
-          //(lb,rb) = refine(lb,rb,j-i,x(j))
           val tmp = binarySearch(lb, rb, x(j), j - i)
-          //println(tmp)
 
-          // perhaps needs more rules
           if (tmp == None) {
             break
           } else {
-            //println("jassoo")
             val tmp_tuple = tmp.get
             lb = tmp_tuple._1
             rb = tmp_tuple._2
@@ -175,11 +160,9 @@ object DistributedRLZFasta {
           }
         }
       }
-      //println("out")
       if (j == i) {
         return (x(j).toString(), 0)
       } else {
-        //println("täällä")
 
         return (getsuf(lb).toString(), j - i)
       }
@@ -194,10 +177,8 @@ object DistributedRLZFasta {
       val output = ArrayBuffer[(String, Long)]()
 
       while (i < x.length()) {
-        //println(i)
 
         val tup = factor(i, x)
-        //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         output += tup
         if (tup._2 == 0) {
           i += 1
@@ -211,23 +192,16 @@ object DistributedRLZFasta {
       }
       return output
     }
-    println("started encoding")
+    println("start encoding")
 
-    //var sampleid = 0
     group._2.foreach{sample =>
-      //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
-
-      /*val exists = fis.exists(new Path(hdfsout+"/" + fname))
-      if(exists){
-        println("File" +fname+ " exists!")
-      }else{*/
 
         val encodings = encode(sample._3)
 
         var fos: FSDataOutputStream = null
         val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
         val nf = new DecimalFormat("#0000")
-        val fname = sample._1+"_"+nf.format(group._1)+"."+chr //.toString.split("/")
+        val fname = sample._1+"_"+nf.format(group._1)+"."+chr
 
 
         try {

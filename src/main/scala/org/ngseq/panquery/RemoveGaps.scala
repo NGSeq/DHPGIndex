@@ -28,8 +28,7 @@ object RemoveGaps {
       .select(org.apache.spark.sql.functions.input_file_name, $"value")
       .as[(String, String)]
       .rdd.map{v=>
-      //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-      //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
+
       val gapless = v._2.replaceAll("-", "")
 
       val fname = v._1.toString.split("/")
@@ -37,12 +36,8 @@ object RemoveGaps {
 
       (header,gapless)
     }.sortBy(_._1).toLocalIterator
-
-    //val bos = new BufferedOutputStream(new FileOutputStream(output,true))
     val pw = new PrintWriter(new File(output))
-    //pw.write(">"+ref._1.split("/").last+"\n")
-    //nref.foreach(x => pw.write(x._2))
-    //pw.close()
+
     val tmp = local.next
     pw.write(tmp._1)
     pw.write(System.lineSeparator())

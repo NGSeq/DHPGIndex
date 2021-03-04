@@ -144,12 +144,12 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
   std::string basefn = kernel_text_filename.substr(kernel_text_filename.find_last_of("/\\") + 1);
   string  tmp_out_filename = "/mnt/tmp/aligned_to_kernel"+basefn+".sam";  // TODO: a better name ?
   string bt2_command_align;
-  string all_flags;
-  if (retrieve_all) {
+  string all_flags="";
+  /*if (retrieve_all) {
     all_flags.assign(" -a");  // bowties uses same flag as bwa. It's ok.
   } else {
     all_flags.assign("");
-  }
+  }*/
   all_flags += " -p"+std::to_string(n_threads);
   //all_flags += " --very-sensitive"; 
   if (single_file_paired) {
@@ -159,6 +159,9 @@ vector<Occurrence>  KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
   /*for (size_t i = 0; i < kernel_options.size(); i++) {
     all_flags += " "+kernel_options[i];
   }*/
+  for (size_t i = 0; i < kernel_options.size(); i++) {
+    all_flags += " "+kernel_options[i];
+  }
   //bt2_command_align.assign(PROJECT_ROOT);
   bt2_command_align = "bowtie2 " + all_flags;
   bt2_command_align += " -x " + kernel_text_filename;  // we have used kernel_text_filename as basename for the index, should be ok.

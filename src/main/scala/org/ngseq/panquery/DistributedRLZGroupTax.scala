@@ -23,7 +23,7 @@ object DistributedRLZGroupTax {
     val dataPath = args(0)
     val hdfsurl = args(1)
     val lzout = args(2)
-    val refsize = args(3).toInt
+    val refquotient = args(3).toInt
     val maxrefs = args(4).toInt
     val tmpout = args(5)
     val preprocesandsave = args(6)
@@ -101,7 +101,7 @@ object DistributedRLZGroupTax {
 
         val notcompletes = group._2.filter(g=>g._5.toLowerCase.contains("complete genome")==false)
         val seqs = notcompletes.toArray.sortBy(_._2)(Ordering[Int].reverse)
-        var dictrefs = (seqs.length/refsize)+1
+        var dictrefs = (seqs.length/refquotient)+1
         if(dictrefs>maxrefs)
           dictrefs = maxrefs
         if(seqs.length<15)

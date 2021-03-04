@@ -22,13 +22,13 @@ object DistributedRLZGroupTaxSplit {
     val dataPath = args(0)
     val hdfsurl = args(1)
     val lzout = args(2)
-    val refsize = args(3).toInt
-    val maxrefs = args(4).toInt
+    val dictquotient = args(3).toInt
+    val maxdictrefs = args(4).toInt
     val tmpout = args(5)
     val preprocesandsave = args(6)
     val filterlen = args(7).toInt
     val groupedout = args(8)
-    val maxplen = args(9).toInt
+    val maxpartitionlen = args(9).toInt
     //val refsplitsize  = args(6).toInt
 
     println("Load and preprocess pan-genome")
@@ -57,9 +57,7 @@ object DistributedRLZGroupTaxSplit {
         var groupname = ""
 
           seq = rec.substring(rec.indexOf(System.lineSeparator)).trim
-          //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-          //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-          //if(taxadepth==1)
+
           val taxsplit = seqname.split(" ")
           var chr = ""
           if (seqname.toLowerCase.indexOf("chromosome") > -1) {
@@ -81,12 +79,9 @@ object DistributedRLZGroupTaxSplit {
 
 
     }.groupBy(g=>g._3).flatMap { g =>
-      /*val cg = g._2.toArray
-      var l = 0
-      cg.foreach(s=>l=l+s._1)*/
 
-      if (g._2.size > maxplen) {
-        val chunks = (g._2.size / maxplen)+1
+      if (g._2.size > maxpartitionlen) {
+        val chunks = (g._2.size / maxpartitionlen)+1
         val s = g._2.grouped(g._2.size/chunks)
         var i = 0
         var its =s.next().map(r=>Tuple4(r._1,r._2,r._3+"idx_"+i,r._4))
@@ -98,10 +93,8 @@ object DistributedRLZGroupTaxSplit {
         its
       }else
          g._2
-    }.groupBy(g=>g._3).zipWithIndex() //
+    }.groupBy(g=>g._3).zipWithIndex()
 
-
-    //println("GROUPS!!!: "+splitted.count())
 
     println("Divided pan-genome to "+splitted.getNumPartitions+" partitions")
     println("Started distributed RLZ")
@@ -109,8 +102,8 @@ object DistributedRLZGroupTaxSplit {
       println("Started compressing tax group"+ group._1._1)
       val completes = group._1._2.filter(g=>g._4.toLowerCase.contains("complete genome"))
       var refs = ""
-      if(completes.size>maxrefs)
-        refs = completes.take(maxrefs).map(s=>s._2).mkString
+      if(completes.size>maxdictrefs)
+        refs = completes.take(maxdictrefs).map(s=>s._2).mkString
       else
         refs = completes.map(s=>s._2).mkString
       /*if(completes.size<maxrefs)
@@ -118,9 +111,9 @@ object DistributedRLZGroupTaxSplit {
 
         val notcompletes = group._1._2.filter(g=>g._4.toLowerCase.contains("complete genome")==false)
         val seqs = notcompletes.toArray.sortBy(_._1)(Ordering[Int].reverse)
-        var dictrefs = (seqs.length/refsize)+1
-        if(dictrefs>maxrefs)
-          dictrefs = maxrefs
+        var dictrefs = (seqs.length/dictquotient)+1
+        if(dictrefs>maxdictrefs)
+          dictrefs = maxdictrefs
         if(seqs.length<15)
           dictrefs = seqs.length
         refs+=seqs.take(dictrefs).map(s=>s._2).mkString
@@ -128,84 +121,18 @@ object DistributedRLZGroupTaxSplit {
         if(refs.length>200000000)
           refs=refs.substring(0,200000000)
 
-
-      /*val uuid = UUID.randomUUID()
-      val reffile = "/mnt/tmp/ref"+group._1+uuid
-      val pw = new PrintWriter(new File(reffile))
-      refs.foreach(x => pw.write(x._3))
-      pw.close()
-      val ref = scala.io.Source.fromFile(reffile).getLines().mkString("")*/
       val reflength = refs.length
       println("Creating Suffix Array from reference sequence of length" +reflength)
-      //println(Process(radixSA + " "+radixparams+" "+reffile+" " + radixout).!)
-      /*
-      println("removing radix")
-      val removed = new File(localOut).delete()*/
-
-      //var is = scala.io.Source.fromFile(radixout).mkString("").trim.split(" ")
  
       val sar = new SAR()
       val SA = sar.suffixArray(refs)
-      /*}catch {
-        case e: FileNotFoundException =>
-          println("REFLEN:"+reflength)
-          println(e.getMessage)
-      }*/
+
       println("removing")
-      /*if(reflength%2!=sasplitsize%2)
-        sasplitsize = sasplitsize-1*/
-      //val chunksize = (reflength/sasplitsize)+1
-      //println("Splitting reflength: "+reflength+" Suffix Array to " +sasplitsize+" chunks of size "+chunksize)
-      /*for(i <- 0 to sasplitsize-1){
 
-        i match {
-          case 0  => sa1.appendAll(is.slice(0,chunksize).toTraversable)
-          case 1  => sa2.appendAll(is.slice(0,chunksize).toTraversable)
-          case 2  => sa3.appendAll(is.slice(0,chunksize).toTraversable)
-          case 3  => sa4.appendAll(is.slice(0,chunksize).toTraversable)
-          case 4  => sa5.appendAll(is.slice(0,chunksize).toTraversable)
-          case 5  => sa6.appendAll(is.slice(0,chunksize).toTraversable)
-          case 6  => sa7.appendAll(is.slice(0,chunksize).toTraversable)
-          case 7  => sa8.appendAll(is.slice(0,chunksize).toTraversable)
-          case 8  => sa9.appendAll(is.slice(0,chunksize).toTraversable)
-          case 9  => sa10.appendAll(is.slice(0,chunksize).toTraversable)
-          case 10  => sa11.appendAll(is.slice(0,chunksize).toTraversable)
-          case 11  => sa12.appendAll(is.slice(0,chunksize).toTraversable)
-          case 12  => sa13.appendAll(is.slice(0,chunksize).toTraversable)
-          case 13  => sa14.appendAll(is.slice(0,chunksize).toTraversable)
-          case 14  => sa15.appendAll(is.slice(0,chunksize).toTraversable)
-          case 15  => sa16.appendAll(is.slice(0,chunksize).toTraversable)
-          // catch the default with a variable so you can print it
-          case default  => ArrayBuffer[(Int)]()
-        }
-
-      }*/
 
     def getsuf(lb: Int) : Int = {
 
       SA(lb)
-      /*val chunk = lb/(sa1.length)
-
-      chunk match {
-        case 0  => return sa1(lb-chunk*sa1.length)
-        case 1  => return sa2(lb-chunk*sa1.length)
-        case 2  => return sa3(lb-chunk*sa1.length)
-        case 3  => return sa4(lb-chunk*sa1.length)
-        case 4  => return sa5(lb-chunk*sa1.length)
-        case 5  => return sa6(lb-chunk*sa1.length)
-        case 6  => return sa7(lb-chunk*sa1.length)
-        case 7  => return sa8(lb-chunk*sa1.length)
-        case 8  => return sa9(lb-chunk*sa1.length)
-        case 9  => return sa10(lb-chunk*sa1.length)
-        case 10  => return sa11(lb-chunk*sa1.length)
-        case 11  => return sa12(lb-chunk*sa1.length)
-        case 12  => return sa13(lb-chunk*sa1.length)
-        case 13  => return sa14(lb-chunk*sa1.length)
-        case 14  => return sa15(lb-chunk*sa1.length)
-        case 15  => return sa16(lb-chunk*sa1.length)
-        // catch the default with a variable so you can print it
-        case default  => return 0
-      }*/
 
     }
 
@@ -216,10 +143,6 @@ object DistributedRLZGroupTaxSplit {
       refs(lb)
 
     }
-
-
-    //val d = "cabbaabba"
-    //val x = "ncabbaaabbaaa"
 
     // binary search that can find the upper and lower bounds
     // e.g for string 1111222555555666677 would return
@@ -282,8 +205,6 @@ object DistributedRLZGroupTaxSplit {
       Some((low_res, low))
     }
 
-    // check newline to deal with partition borders (stop phrase search if goes
-    // to newline
     def factor(i: Int, x: String): (String, Long) = {
 
       var lb = 0
@@ -296,15 +217,12 @@ object DistributedRLZGroupTaxSplit {
           if (lb == rb && getref(getsuf(lb) + j - i) != x(j)) {
             break
           }
-          //(lb,rb) = refine(lb,rb,j-i,x(j))
-          val tmp = binarySearch(lb, rb, x(j), j - i)
-          //println(tmp)
 
-          // perhaps needs more rules
+          val tmp = binarySearch(lb, rb, x(j), j - i)
+
           if (tmp == None) {
             break
           } else {
-            //println("jassoo")
             val tmp_tuple = tmp.get
             lb = tmp_tuple._1
             rb = tmp_tuple._2
@@ -316,11 +234,10 @@ object DistributedRLZGroupTaxSplit {
           }
         }
       }
-      //println("out")
+
       if (j == i) {
         return (x(j).toString(), 0)
       } else {
-        //println("täällä")
 
         return (getsuf(lb).toString(), j - i)
       }
@@ -367,11 +284,10 @@ object DistributedRLZGroupTaxSplit {
 
       } catch {
         case e: IOException =>
-        //e.printStackTrace()
+          e.printStackTrace()
       }
-    //var sampleid = 0
+
     group._1._2.foreach{sample =>
-      //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
       val encodings = encode(sample._2)
 
       try {
@@ -402,12 +318,9 @@ object DistributedRLZGroupTaxSplit {
         }
       }
 
-      //sampleid+=1
     }
       fos.close()
       fos2.close()
-      //val delref = new File(reffile).delete()
-      //      val delrad = new File(radixout).delete()
     }
 
     spark.stop()

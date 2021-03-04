@@ -15,12 +15,10 @@ make
 cd ${CUR}
 
 #cd modules/chic/src
-
 #make all
+#cd ${CUR}
 
-cd ${CUR}
-
-cd modules/radix
+cd modules/LZ-tools
 
 make
 
@@ -29,12 +27,14 @@ cd ${CUR}
 #pip install numpy
 #pip install biopython
 
-
-cp modules/chic/ext/LZ/RLZ_parallel/src/rlz_for_hybrid rlz_for_hybrid
-cp modules/chic/src/chic_index components/index/chic_index
-cp modules/chic/src/chic_align components/index/chic_align
-cp modules/chic/src/chic_map components/index/chic_map
-cp modules/radix/radixSA radixSA
+cp modules/chic/src/chic_index index/chic_index
+cp modules/chic/src/chic_align index/chic_align
+cp modules/chic/src/chic_map index/chic_map
+cp modules/LZ-tools/merge_limits index/
+cp modules/LZ-tools/merge_meta_offsets index/
+cp modules/LZ-tools/merge_with_offsets index/
 
 sbt compile
+
+
 

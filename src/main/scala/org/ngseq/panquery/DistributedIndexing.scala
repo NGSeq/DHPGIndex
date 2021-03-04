@@ -43,7 +43,6 @@ object DistributedIndexing{
       while(part.hasNext){
         val record = part.next()._2.toString
         pw.write(">"+record)
-        //TODO: check that chunks are read in correct order
         val fstatus = fs.globStatus(new Path(hdfsurl+"/"+hdfsout+"/"+record.split(System.lineSeparator())(0)+"*"))
         fstatus.foreach{f=>
           System.out.println(f.getPath.getName)
@@ -61,15 +60,13 @@ object DistributedIndexing{
       pw.close()
       bos.close()
 
-      //val writer = new BufferedWriter(new OutputStreamWriter(chic.getOutputStream))
-
-      val chicproc = new ProcessBuilder("/bin/bash", "-c", "/opt/chic/src/chic_index --threads=22  --kernel=BLAST --verbose=2 --lz-input-file=/mnt/tmp/"+id+".lz -o /mnt/tmp/"+id+".idx /mnt/tmp/"+id+".fa 80")
+      val chicproc = new ProcessBuilder("/bin/bash", "-c", "/opt/chic/src/chic_index --threads=16  --kernel=BLAST --verbose=2 --lz-input-file=/mnt/tmp/"+id+".lz -o /mnt/tmp/"+id+".idx /mnt/tmp/"+id+".fa 80")
       val chic = chicproc.start()
-      /*val err = new BufferedReader(new InputStreamReader(chic.getErrorStream))
+      val err = new BufferedReader(new InputStreamReader(chic.getErrorStream))
       var e = ""
       while ( {(e = err.readLine) != null}) {
         System.out.println("ERROR:"+e)
-      }*/
+      }
 
       }
 
