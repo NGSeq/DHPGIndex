@@ -7,28 +7,29 @@ import java.text.DecimalFormat
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
+import org.apache.spark.TaskContext
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks._
 
-object DistributedRLZGroupTax {
+
+
+object DistributedRLZGroupTaxa {
 
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
 
-    val nf2 = new DecimalFormat("#00")
     val dataPath = args(0)
     val hdfsurl = args(1)
     val lzout = args(2)
-    val refquotient = args(3).toInt
-    val maxrefs = args(4).toInt
-    val tmpout = args(5)
+    val preprocout = args(3)
+    val refquotient = args(4).toDouble
+    val filterlen = args(5).toInt
     val preprocesandsave = args(6)
-    val filterlen = args(7).toInt
-    val groupedout = args(8)
+
+
     //val refsplitsize  = args(6).toInt
 
     println("Load and preprocess pan-genome")
@@ -44,67 +45,74 @@ object DistributedRLZGroupTax {
         if(seq.length<filterlen)
           (">")
         else (">" + header + System.lineSeparator() + seq)
-      }.filter(x=>x.length>filterlen).saveAsTextFile(tmpout)
+      }.filter(x=>x.length>filterlen).saveAsTextFile(preprocout)
     }
 
-    val splitted = prep.zipWithIndex().map{rec=>
+    val splitted = prep.map{rec=>
 
-        val id = rec._2
-        val seqname = rec._1.substring(1,rec._1.indexOf(System.lineSeparator))
+      val seqname = rec.substring(1,rec.indexOf(System.lineSeparator))
 
-        var seq=""
-        var groupname = ""
+      var seq=""
+      var groupname = ""
 
-          seq = rec._1.substring(rec._1.indexOf(System.lineSeparator)).trim
-          //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-          //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-          //if(taxadepth==1)
-          val taxsplit = seqname.split(" ")
-          var chr = ""
-          if (seqname.toLowerCase.indexOf("chromosome") > -1) {
-            val s1 = seqname.toLowerCase.split("chromosome")
-            if (s1.length > 1)
-              chr = "chr" + s1(1).split(",")(0).replaceAll("[^A-Za-z0-9]", "").trim
-          }
-          if (taxsplit.length > 0)
-            groupname = taxsplit(0).replaceAll("[^A-Za-z0-9]", "")
-          if (taxsplit.length > 1)
-            groupname = taxsplit(1).replaceAll("[^A-Za-z0-9]", "")
-          if (taxsplit.length > 2)
-            groupname += taxsplit(2).replaceAll("[^A-Za-z0-9]", "")
-          groupname += "_" + chr
-          if(groupname.length>200)
-            groupname = groupname.substring(0,200)
+      seq = rec.substring(rec.indexOf(System.lineSeparator)).trim
+      val taxsplit = seqname.split(" ")
+      var chr = ""
+      if (seqname.toLowerCase.indexOf("chromosome") > -1) {
+        val s1 = seqname.toLowerCase.split("chromosome")
+        if (s1.length > 1)
+          chr = "chr" + s1(1).split(",")(0).replaceAll("[^A-Za-z0-9]", "").trim
+      }
+      if (taxsplit.length > 0)
+        groupname = taxsplit(0).replaceAll("[^A-Za-z0-9]", "")
+      if (taxsplit.length > 1)
+        groupname = taxsplit(1).replaceAll("[^A-Za-z0-9]", "")
+      if (taxsplit.length > 2)
+        groupname += taxsplit(2).replaceAll("[^A-Za-z0-9]", "")
+      groupname += "_" + chr
+      if(groupname.length>200)
+        groupname = groupname.substring(0,200)
 
-        Tuple5(id,seq.length,seq, groupname, seqname)
+      //System.out.println(groupname+" "+seqname)
+      Tuple4(seq.length,seq, groupname, seqname)
 
 
-    }.groupBy(g=>g._4).persist(StorageLevel.MEMORY_ONLY_SER)
-
-
-    //println("GROUPS!!!: "+splitted.count())
+    }
 
     println("Divided pan-genome to "+splitted.getNumPartitions+" partitions")
     println("Started distributed RLZ")
-    splitted.foreach{group=>
-      println("Started compressing tax group"+ group._1)
-      val completes = group._2.filter(g=>g._5.toLowerCase.contains("complete genome"))
-      var refs = ""
-      if(completes.size>maxrefs)
-        refs = completes.take(maxrefs).map(s=>s._3).mkString
-      else
-        refs = completes.map(s=>s._3).mkString
-      /*if(completes.size<maxrefs)
-        group._2.groupBy(k=>k)*/
+    splitted.foreachPartition{part=>
 
-        val notcompletes = group._2.filter(g=>g._5.toLowerCase.contains("complete genome")==false)
-        val seqs = notcompletes.toArray.sortBy(_._2)(Ordering[Int].reverse)
-        var dictrefs = (seqs.length/refquotient)+1
-        if(dictrefs>maxrefs)
-          dictrefs = maxrefs
-        if(seqs.length<15)
-          dictrefs = seqs.length
-        refs+=seqs.take(dictrefs).map(s=>s._3).mkString
+      val data = ArrayBuffer.empty[Tuple4[Int, String, String, String]]
+      while(part.hasNext)
+        data.+=(part.next())
+
+      var refs = ""
+      var totlen = 0
+      data.foreach(totlen+=_._1)
+      var dictlen=totlen*refquotient
+      println("DATA0"+data(0)._4)
+
+      val gr = data.groupBy(_._3).map(d=>Tuple2((d._2.length),(d._2))).toArray.sortBy(_._1)(Ordering[Int].reverse)
+
+      val dicts = ArrayBuffer.empty[Tuple4[Int, String, String, String]]
+
+      var top = 0
+      var len = 0
+
+      breakable{
+        gr.foreach(g=>{
+            g._2.foreach(s=>{
+              dicts.+=(s)
+              len+=s._1
+              if(len>dictlen)
+                break()
+            })
+            top=g._1
+        })
+      }
+
+      refs+=dicts.map(s=>s._2).mkString
 
       val reflength = refs.length
       println("Creating Suffix Array from reference sequence of length" +reflength)
@@ -200,15 +208,20 @@ object DistributedRLZGroupTax {
       var j = i
       breakable {
         while (j < x.length()) {
+          //println("j: " + j + " SA.value: " + SA.value(lb))
+          //println((SA.value(lb)+j-i) + " " + d.length())
           if (lb == rb && getref(getsuf(lb) + j - i) != x(j)) {
             break
           }
-
+          //(lb,rb) = refine(lb,rb,j-i,x(j))
           val tmp = binarySearch(lb, rb, x(j), j - i)
+          //println(tmp)
 
+          // perhaps needs more rules
           if (tmp == None) {
             break
           } else {
+            //println("jassoo")
             val tmp_tuple = tmp.get
             lb = tmp_tuple._1
             rb = tmp_tuple._2
@@ -220,9 +233,12 @@ object DistributedRLZGroupTax {
           }
         }
       }
+      //println("out")
       if (j == i) {
         return (x(j).toString(), 0)
       } else {
+        //println("täällä")
+
         return (getsuf(lb).toString(), j - i)
       }
     }
@@ -236,8 +252,10 @@ object DistributedRLZGroupTax {
       val output = ArrayBuffer[(String, Long)]()
 
       while (i < x.length()) {
+        //println(i)
 
         val tup = factor(i, x)
+        //println("<<<<<<<\n"+tup+"\n<<<<<<<")
         output += tup
         if (tup._2 == 0) {
           i += 1
@@ -254,33 +272,26 @@ object DistributedRLZGroupTax {
     println("started encoding")
 
       var fos: FSDataOutputStream = null
-      var fos2: FSDataOutputStream = null
-
       val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
       try {
-        val nf = new DecimalFormat("#0000000000")
-        val fname = nf.format(group._2.take(1).toIterator.next()._1)+"_"+group._1 //.toString.split("/")
+        val nf = new DecimalFormat("#0000000")
+
+        val fname = "part-"+nf.format(TaskContext.getPartitionId()) //.toString.split("/")
 
         fos = fis.create(new Path(lzout+"/" + fname+".lz"))
-        fos2 = fis.create(new Path(groupedout+"/" + fname+".fa"))
 
       } catch {
         case e: IOException =>
-         e.printStackTrace()
+        //e.printStackTrace()
       }
-    group._2.foreach{sample =>
-      val encodings = encode(sample._3)
+    //var sampleid = 0
 
-      try {
-        fos2.writeBytes(">" + sample._5 + System.lineSeparator() + sample._3 + System.lineSeparator())
-      }catch {
-        case e: NullPointerException =>
-          e.printStackTrace()
-      }
+    data.foreach(sample=>{
+      //println("GROUP: "+x._2+" "+x._3.length+" "+x._4+" REFL: "+ reflength)
+      val encodings = encode(sample._2)
 
       encodings.foreach{z =>
         var posBytes: Array[Byte] = null
-
         val len = z._2
         if(len != 0) {
           posBytes = ByteBuffer.allocate(8).putLong(z._1.toLong).array.reverse
@@ -299,9 +310,11 @@ object DistributedRLZGroupTax {
         }
       }
 
-    }
+      //sampleid+=1
+    })
       fos.close()
-      fos2.close()
+      //val delref = new File(reffile).delete()
+      //      val delrad = new File(radixout).delete()
     }
 
     spark.stop()

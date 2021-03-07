@@ -201,7 +201,7 @@ object DistributedRLZFasta {
         var fos: FSDataOutputStream = null
         val fis = FileSystem.get(new URI(hdfsurl),new Configuration())
         val nf = new DecimalFormat("#0000")
-        val fname = sample._1+"_"+nf.format(group._1)+"."+chr
+        val fname = sample._1.replaceAll(" ","").replaceAll(":","")+"_"+nf.format(group._1)+"."+chr
 
 
         try {
