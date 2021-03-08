@@ -1,4 +1,4 @@
-name := "panquery"
+name := "dhpgidx"
 
 version := "0.1"
 
