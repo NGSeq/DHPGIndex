@@ -49,7 +49,7 @@ Use allready assembled sequences and skip the vcf2multialign stage (uncomment li
 ### Modify variables
 ---
 
-To run the whole pipeline bash scirpt `launch.sh` is used.
+To run the whole pipeline bash scirpt `pipeline_hg.sh` is used.
 The initial configuration assumes at least 22 worker nodes for running chromosomes 1-22 in some stages in parallel (if less used only the numbered chromosomes are assembled).
 Modify static paths to fit your configuration in the launch.sh
 
