@@ -1,4 +1,4 @@
-Pangendex
+DHPGIndex
 =================
 
 General
