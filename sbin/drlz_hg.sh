@@ -10,7 +10,7 @@ CORES=4
 HDFSURL="hdfs://node-1.novalocal:8020"
 
 i=$(printf "%02d" $1)
-echo Submitting job with args $1 $2 $3 $4 $5 $6
+echo Submitting job with args $1 $2 $3 $4 $5 $6remote
 
 #spark.dynamicAllocation.minExecutors, spark.dynamicAllocation.maxExecutors, and spark.dynamicAllocation.initialExecutors spark.dynamicAllocation.executorAllocationRatio
 #--conf spark.scheduler.allocation.file=/opt/spark/conf/fairscheduler.xml.template --conf spark.scheduler.pool=pool1

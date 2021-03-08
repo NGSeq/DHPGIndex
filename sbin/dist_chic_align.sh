@@ -2,7 +2,6 @@
 set -e 
 set -o pipefail
 
-HDFSPGPATH=$1
 align() {
     i=$(printf "%02d" $1)
 

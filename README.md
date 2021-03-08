@@ -16,9 +16,6 @@ Requirements
 * HDFS
 
 
-
-
-
 Installation
 -------
 
@@ -71,15 +68,13 @@ NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starti
 ---
 
 ```bash
-./launch.sh /data/pangenome/ /data/ngsreads/reads.fq.1.fastq /data/ngsreads/reads.fq.2.fastq
+./pipeline_hg.sh /data/pangenome/ /data/ngsreads/reads.fq.1.fastq /data/ngsreads/reads.fq.2.fastq
 ```
 Here the first parameter is a local filesystem folder where the pangenome sequence files are generated to.
 The pangenome data is automatically uploaded to the HDFS under the same folder.
 The next two parameters are are local paired-end read files that are are also uploaded to HDFS and aligned eventually against the pan genome index.
 
-The assembled reference genome is written to HDFS under 'adhoc' folder for each chromosome and downloaded to the local filesystem with the same name.
-
-To be noted
+Note
 ------------------
 
 * At least 2x size of pan-genome in master node is required for local storage and worker nodes should have storage at least 2x of chromosomal pan-genome data size.

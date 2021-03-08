@@ -9,6 +9,7 @@ export SPARK_MAJOR_VERSION=2
 
 PGPATHLOCAL=$1
 PGPATHHDFS=pg
+DRLZPATHHDFS=drlz
 
 READS_1=$2
 READS_2=$3
@@ -48,7 +49,7 @@ echo "Loading files to HDFS..."
 date >> runtime.log
 echo "Starting DRLZ.." 
 start=`date +%s`
-seq 1 22 | xargs -I{} -n 1 -P 4 ./drlz_hg.sh {} $PGPATHHDFS/pg/ ${PGPATHHDFS}/drlz 75 40 50 30
+seq 1 22 | xargs -I{} -n 1 -P 4 ./drlz_hg.sh {} $PGPATHHDFS/ $DRLZPATHHDFS/ 75 40 50 30
 runtime=$((end-start))
 echo "DRLZ compression time: ${runtime}" >> runtime.log
 

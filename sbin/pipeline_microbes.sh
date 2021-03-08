@@ -9,6 +9,7 @@ export SPARK_MAJOR_VERSION=2
 
 PGPATHLOCAL=$1
 PGPATHHDFS=pg
+DRLZPATHHDFS=drlz
 
 READS_1=$2
 READS_2=$3
@@ -53,7 +54,7 @@ echo "DRLZ compression time: ${runtime}" >> runtime.log
 date >> runtime.log
 echo "Starting distributed Kernelization.."
 start=`date +%s`
-seq 1 25 | xargs -I{} -n 1 -P 22 ssh -tt -o "StrictHostKeyChecking no" $NODE{} /opt/chic/index/index_partition.sh {} $PGPATHHDFS/pg/ $PGPATHHDFS/drlz --kernelize
+seq 1 25 | xargs -I{} -n 1 -P 22 ssh -tt -o "StrictHostKeyChecking no" $NODE{} /opt/chic/index/index_partition.sh {} $PGPATHHDFS/ $DRLZPATHHDFS/ --kernelize
 
 end=`date +%s`
 runtime=$((end-start))
