@@ -1,0 +1,9 @@
+Copyright Daniel Valenzuela
+
+Simple decoder of LZ77 valid parsings, in the format used by CHICO.
+That is, each phrase is encoded as a pair of 64 bits integer.
+
+It receives a buffer length parameter L , and it assumes all the sources are
+within the range [L]. 
+
+
