@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+#Download latest from https://github.com/tsnorri/vcf2multialign
+
 PGPATHHDFS=$1
 PGPATHLOCAL=$2
 STDREFPATH=$3

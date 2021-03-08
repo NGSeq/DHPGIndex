@@ -1,20 +1,36 @@
 #!/usr/bin/env bash
 
-#!/usr/bin/env bash
-
+CUR=pwd
 ###### USE ONLY FOR TESTING PURPOSES. USE AT YOUR OWN RISK. ######
 
-#Assume we have 22 nodes having hostnames node-1...node-22 and we are logged in as root user
-#Hadoop is installed in folder /opt/hadoop and Spark in /opt/spark
+#Assume we have 26 nodes having hostnames node-1...node-26 and we are logged in as root user
+#Hadoop is installed in folder /opt/hadoop and Spark in /opt/spark on every node
 
 #####Get Hadoop and Spark
 wget https://archive.apache.org/dist/hadoop/core/hadoop-2.7.3/hadoop-2.7.3.tar.gz -O /opt/hadoop-2.7.3.tar.gz
 tar -xf /opt/hadoop-2.7.3.tar.gz
 mv /opt/hadoop-2.7.3 /opt/hadoop
 
-wget wget http://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2-bin-hadoop2.7.tgz -O /opt/spark-2.3.2-bin-hadoop2.7.tgz
+wget http://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2-bin-hadoop2.7.tgz -O /opt/spark-2.3.2-bin-hadoop2.7.tgz
 tar -xf /opt/spark-2.3.2-bin-hadoop2.7.tgz
 mv /opt/spark-2.3.2-bin-hadoop2.7 /opt/spark
+
+wget https://github.com/BenLangmead/bowtie2/releases/download/v2.4.2/bowtie2-2.4.2-linux-x86_64.zip -O /opt/bowtie2-2.4.2-linux-x86_64.zip
+unzip /opt/bowtie2-2.4.2-linux-x86_64.zip
+mv /opt/bowtie2-2.4.2-linux-x86_64 /opt/bowtie
+
+wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.8.0alpha/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz -O /opt/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz
+tar -xf /opt/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz
+mv /opt/ncbi-blast-2.8.0-alpha+-x64-linux /opt/blast
+
+wget https://github.com/samtools/samtools/releases/download/1.11/samtools-1.11.tar.bz2 -O /opt/samtools-1.11.tar.bz2
+tar -xf /opt/samtools-1.11.tar.bz2
+mv /opt/samtools-1.11.tar.bz2  /opt/samtools
+cd /opt/samtools
+make /opt/samtools
+cd $CUR
+
+
 
 #Modify hosts, HDFS dirs, memory options in /opt/hadoop/etc/hadoop/core-site.xml, /opt/hadoop/etc/hadoop/hdfs-site.xml, /opt/hadoop/etc/hadoop/yarn-site.xml and /opt/spark/conf/spark-defaults.conf
 #add all nodes to /etc/hosts and /opt/hadoop/etc/hadoop/workers file
@@ -88,7 +104,7 @@ mv /opt/spark-2.3.2-bin-hadoop2.7 /opt/spark
 #</configuration>
 
 #### /opt/hadoop/etc/hadoop/workers
-#node-1
+
 #node-2
 #node-3
 #node-4
@@ -110,6 +126,10 @@ mv /opt/spark-2.3.2-bin-hadoop2.7 /opt/spark
 #node-20
 #node-21
 #node-22
+#node-23
+#node-24
+#node-25
+#node-26
 
 #### /opt/spark/conf/spark-defaults.conf
 #spark.eventLog.enabled           true
@@ -166,18 +186,19 @@ hdfs dfs -mkdir /user
 hdfs dfs -mkdir /user/root
 
 mkdir -p /opt/chic/
-cp -r components/index/ /opt/chic/
+cp -r ../index/ /opt/chic/
 mkdir -p /mnt/tmp
 
 #Setup worker nodes
-for i in {1..26}; do
+for i in {2..26}; do
     ssh -tt -o "StrictHostKeyChecking no" node-$i mkdir /opt/chic/
-    scp -o "StrictHostKeyChecking no" -r components/index/ node-$i:/opt/chic/
+    scp -o "StrictHostKeyChecking no" -r ../index/ node-$i:/opt/chic/
 
-    ssh -tt -o "StrictHostKeyChecking no" node-$i mkdir -p $CUR/modules/chic/ext/
-    scp -o "StrictHostKeyChecking no" -r  modules/chic/ext/BOWTIE2 node-$i:$CUR/modules/chic/ext/
-    ssh -tt -o "StrictHostKeyChecking no" node-$i mkdir -p /opt/samtools
-    scp -o "StrictHostKeyChecking no"  samtools-1.10/* node-$i:/opt/samtools/
+    ssh -tt -o "StrictHostKeyChecking no" node-$i mkdir -p /opt/chic/ext/
+    scp -o "StrictHostKeyChecking no" -r  ../modules/chic/ext/BOWTIE2 node-$i:/opt/chic/ext/
+    scp -o "StrictHostKeyChecking no"  -r /opt/bowtie2/ node-$i:/opt/
+    scp -o "StrictHostKeyChecking no"  -r /opt/blast/ node-$i:/opt/
+    scp -o "StrictHostKeyChecking no"  -r /opt/samtools/ node-$i:/opt/
     ssh -tt -o "StrictHostKeyChecking no" node-$i mkdir /mnt/tmp
 
     #scp -o "StrictHostKeyChecking no" /opt/hadoop/etc/hadoop/* node-$i:/opt/hadoop/etc/hadoop/ &

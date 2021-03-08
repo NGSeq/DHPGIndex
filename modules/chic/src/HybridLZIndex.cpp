@@ -83,12 +83,7 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
   SetFileNames();
     this->hdfs_path = parameters->hdfs_path;
   if(parameters->kernelizeonly==1){
-      this->hdfs_path = parameters->hdfs_path;
-      if(parameters->indexingonly==1)
-          Build();
-      else
           InitKernelizeonly();
-
   }else{
       if(parameters->indexingonly==1)
           Indexing();
@@ -102,8 +97,6 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
 
 void HybridLZIndex::Build() {
     try {
-
-
 
     if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST ) {
     special_separator = (uchar)'N';
@@ -212,18 +205,20 @@ void HybridLZIndex::Kernelizeonly() {
     uchar *kernel_text;
 
     long t1 = Utils::wclock();
-    MyBuffer * my_buffer;
-    /*if (lz_method == LZMethod::IN_MEMORY) {
-        my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
+
+ MyBuffer * my_buffer;
+  if (lz_method == LZMethod::IN_MEMORY) {
+    my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
+  } else {
+    //if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
+    if (Utils::IsBioKernel(kernel_type)) {
+            if(this->hdfs_path != NULL)
+                my_buffer = new MyBufferHDFS(this->hdfs_path);
+            else my_buffer = new MyBufferFastaFile(text_filename);
     } else {
-        //if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
-        if (Utils::IsBioKernel(kernel_type)) {
-            my_buffer = new MyBufferFastaFile(text_filename);
-        } else {
-            my_buffer = new MyBufferHDFS(text_filename);
-        }
-    }*/
-    my_buffer = new MyBufferHDFS(hdfs_path);
+      my_buffer = new MyBufferPlainFile(text_filename);
+    }
+  }
 
     MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
     long t2 = Utils::wclock();
@@ -232,21 +227,11 @@ void HybridLZIndex::Kernelizeonly() {
     delete(my_buffer);
 
     long k1 = Utils::wclock();
-    if (kernel_type == KernelType::FMI) {
-        //this->WriteToHDFS(kernel_text);
-        this->WriteKernelTextFile(kernel_text, kernel_text_len);
-    } else if (kernel_type == KernelType::BWA) {
-        this->WriteKernelTextFile(kernel_text, kernel_text_len);
-    } else if (kernel_type == KernelType::BOWTIE2) {
-        this->WriteKernelTextFile(kernel_text, kernel_text_len);
-    } else if (kernel_type == KernelType::BLAST) {
-        this->WriteKernelTextFile(kernel_text, kernel_text_len);
-    } else {
-        cerr << "Unknown kernel type given" << endl;
-        exit(EXIT_FAILURE);
-    }
+
+    this->WriteKernelTextFile(kernel_text, kernel_text_len);
+
     long k2 = Utils::wclock();
-    cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
+    cout << "Kernelized: "<< (t2-t1) << " seconds. " << endl;
 
     //delete [] kernel_text;
 

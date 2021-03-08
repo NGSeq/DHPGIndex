@@ -1,4 +1,4 @@
-package org.ngseq.panquery
+package org.ngseq.dhpgidx
 
 import java.io._
 import java.net.URI

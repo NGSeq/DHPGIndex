@@ -1,4 +1,4 @@
-package org.ngseq.panquery
+package org.ngseq.dhpgidx
 
 import java.io._
 import java.net.URI
@@ -19,33 +19,17 @@ object DistributedRLZGroupTax {
 
     val spark = SparkSession.builder.appName("DRLZ").getOrCreate()
 
-    val nf2 = new DecimalFormat("#00")
     val dataPath = args(0)
     val hdfsurl = args(1)
     val lzout = args(2)
-    val refquotient = args(3).toInt
+    val refquotient = args(3).toDouble
     val maxrefs = args(4).toInt
-    val tmpout = args(5)
-    val preprocesandsave = args(6)
-    val filterlen = args(7).toInt
-    val groupedout = args(8)
-    //val refsplitsize  = args(6).toInt
+    val groupedout = args(5)
 
     println("Load and preprocess pan-genome")
     spark.sparkContext.hadoopConfiguration.set("textinputformat.record.delimiter",">")
-    val conf = new Configuration(spark.sparkContext.hadoopConfiguration)
-    conf.set("textinputformat.record.delimiter", ">")
 
     val prep = spark.sparkContext.textFile(dataPath).filter(x=>x.length!=0)
-    if(preprocesandsave=="1") {
-      prep.map { fa =>
-        val header = fa.substring(0, fa.indexOf(System.lineSeparator))
-        val seq = fa.substring(fa.indexOf(System.lineSeparator)).replaceAll(System.lineSeparator(), "")
-        if(seq.length<filterlen)
-          (">")
-        else (">" + header + System.lineSeparator() + seq)
-      }.filter(x=>x.length>filterlen).saveAsTextFile(tmpout)
-    }
 
     val splitted = prep.zipWithIndex().map{rec=>
 
@@ -56,9 +40,7 @@ object DistributedRLZGroupTax {
         var groupname = ""
 
           seq = rec._1.substring(rec._1.indexOf(System.lineSeparator)).trim
-          //val groups = v.grouped(x._1._2.length()/numSplits).toArray
-          //groups.zipWithIndex.map(y => (fileName,y._2,x._2,y._1))
-          //if(taxadepth==1)
+
           val taxsplit = seqname.split(" ")
           var chr = ""
           if (seqname.toLowerCase.indexOf("chromosome") > -1) {
@@ -79,12 +61,8 @@ object DistributedRLZGroupTax {
         Tuple5(id,seq.length,seq, groupname, seqname)
 
 
-    }.groupBy(g=>g._4).persist(StorageLevel.MEMORY_ONLY_SER)
+    }.groupBy(g=>g._4).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
-
-    //println("GROUPS!!!: "+splitted.count())
-
-    println("Divided pan-genome to "+splitted.getNumPartitions+" partitions")
     println("Started distributed RLZ")
     splitted.foreach{group=>
       println("Started compressing tax group"+ group._1)
@@ -94,17 +72,15 @@ object DistributedRLZGroupTax {
         refs = completes.take(maxrefs).map(s=>s._3).mkString
       else
         refs = completes.map(s=>s._3).mkString
-      /*if(completes.size<maxrefs)
-        group._2.groupBy(k=>k)*/
 
-        val notcompletes = group._2.filter(g=>g._5.toLowerCase.contains("complete genome")==false)
-        val seqs = notcompletes.toArray.sortBy(_._2)(Ordering[Int].reverse)
-        var dictrefs = (seqs.length/refquotient)+1
-        if(dictrefs>maxrefs)
-          dictrefs = maxrefs
-        if(seqs.length<15)
-          dictrefs = seqs.length
-        refs+=seqs.take(dictrefs).map(s=>s._3).mkString
+      val notcompletes = group._2.filter(g=>g._5.toLowerCase.contains("complete genome")==false)
+      val seqs = notcompletes.toArray.sortBy(_._2)(Ordering[Int].reverse)
+      var dictrefs = (seqs.length*refquotient).toInt
+      if(dictrefs>maxrefs)
+        dictrefs = maxrefs
+      if(seqs.length<15)
+        dictrefs = seqs.length
+      refs+=seqs.take(dictrefs).map(s=>s._3).mkString
 
       val reflength = refs.length
       println("Creating Suffix Array from reference sequence of length" +reflength)

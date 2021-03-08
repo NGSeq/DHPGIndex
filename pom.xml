@@ -3,14 +3,14 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-        <artifactId>panquery</artifactId>
-        <groupId>org.ngseq.panquery</groupId>
+        <artifactId>dhpgidx</artifactId>
+        <groupId>org.ngseq.dhpgidx</groupId>
         <version>0.1</version>
 
     <modelVersion>4.0.0</modelVersion>
 
     <properties>
-        <sbt.project.name>panquery</sbt.project.name>
+        <sbt.project.name>dhpgidx</sbt.project.name>
         <htsjdk.version>2.5.0</htsjdk.version>
         <scala.version>2.11.8</scala.version>
         <scala.binary.version>2.12</scala.binary.version>

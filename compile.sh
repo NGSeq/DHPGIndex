@@ -34,7 +34,6 @@ cp modules/LZ-tools/merge_limits index/
 cp modules/LZ-tools/merge_meta_offsets index/
 cp modules/LZ-tools/merge_with_offsets index/
 
-sbt compile
-
+mvn package
 
 

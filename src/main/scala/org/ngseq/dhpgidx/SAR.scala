@@ -1,4 +1,4 @@
-package org.ngseq.panquery
+package org.ngseq.dhpgidx
 
 
 /** Implementation of suffix-array.

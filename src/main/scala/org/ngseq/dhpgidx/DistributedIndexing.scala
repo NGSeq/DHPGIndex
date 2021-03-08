@@ -1,4 +1,4 @@
-package org.ngseq.panquery
+package org.ngseq.dhpgidx
 
 import java.io._
 import java.net.URI
@@ -21,8 +21,8 @@ object DistributedIndexing{
     val hdfsurl = args(1)
     val hdfsout = args(2)
     val chunks = args(3).toInt
+    val maxqlen = args(4).toInt
 
-//TODO: Does not work as ls -lhtr /mrdiLZ can refezWe can split only  per CHROMOSOME, and blast is restricted to 4GB kernel input
     println("Load and preprocess pan-genome")
     spark.sparkContext.hadoopConfiguration.set("textinputformat.record.delimiter",">")
     val conf = new Configuration(spark.sparkContext.hadoopConfiguration)
@@ -60,7 +60,7 @@ object DistributedIndexing{
       pw.close()
       bos.close()
 
-      val chicproc = new ProcessBuilder("/bin/bash", "-c", "/opt/chic/src/chic_index --threads=16  --kernel=BLAST --verbose=2 --lz-input-file=/mnt/tmp/"+id+".lz -o /mnt/tmp/"+id+".idx /mnt/tmp/"+id+".fa 80")
+      val chicproc = new ProcessBuilder("/bin/bash", "-c", "/opt/chic/src/chic_index --threads=16  --kernel=BLAST --verbose=2 --lz-input-file=/mnt/tmp/"+id+".lz -o /mnt/tmp/"+id+".idx /mnt/tmp/"+id+".fa "+maxqlen)
       val chic = chicproc.start()
       val err = new BufferedReader(new InputStreamReader(chic.getErrorStream))
       var e = ""
