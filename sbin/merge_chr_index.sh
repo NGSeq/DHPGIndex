@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
 LOCALMERGEDINDEXPATH=$1
-ALIGNER=BOWTIE2
-MAX_QUERY_LEN=102
-cpus=$(lscpu -p | wc -l)
 
 metaf=""
 limitf=""

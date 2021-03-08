@@ -16,5 +16,5 @@ echo Executing index_chr.sh $1 $2 with $cpus cpus
     i=$(printf "%02d" $CHR)
     hdfs dfs -getmerge $HDFSLZPATH/*.$i $LOCALPATH/chr$i.lz&
     hdfs dfs -getmerge $HDFSPGPATH/*.$i $LOCALPATH/chr$i.fa
-    /opt/chic/index/chic_index --threads=${cpus}  --kernel=${ALIGNER} --verbose=2 $mode --lz-input-file=${LOCALPATH}/chr${i}.lz ${LOCALPATH}/chr${i}.fa ${MAX_QUERY_LEN}
+    /opt/chic/index/chic_index --threads=${cpus}  --kernel=${ALIGNER} --verbose=2 $mode --lz-input-file=${LOCALPATH}/chr${i}.lz ${LOCALPATH}/chr${i}.fa ${MAX_QUERY_LEN} &> chic_index.log
 
