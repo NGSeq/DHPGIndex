@@ -33,7 +33,7 @@ or
 Manually with minimal configuration by following the instructions in sbin/spark-hadoop-init.sh and running the script.
 
 
-Exmperimenting
+Experimenting
 ---
 ### Preparing data
 ---
