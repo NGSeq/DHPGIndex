@@ -7,7 +7,7 @@ HDFSPGPATH=$2
 HDFSLZPATH=$3
 LOCALPATH=/mnt/tmp
 ALIGNER=BLAST
-MAX_QUERY_LEN=102
+MAX_QUERY_LEN=1000
 cpus=$(lscpu -p | wc -l)
 
 echo Executing index_partition.sh $1 $2 with $cpus cpus
