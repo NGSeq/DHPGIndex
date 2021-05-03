@@ -1,107 +1,85 @@
 #!/usr/bin/env bash
 
-#set -e
+set -e
 #set -o pipefail
-set -v
-set -x
+#set -v
+#set -x
 
 export SPARK_MAJOR_VERSION=2
 
-PGPATHLOCAL=$1
-PGPATHHDFS=pg
-DRLZPATHHDFS=drlz
-
-READS_1=$2
-READS_2=$3
-
-#USE with BLAST
-#QSEQS=$2
-
-#Put read files to HDFS if distributed alignment is preferred
-#hdfs dfs -mkdir -p reads_1&
-#hdfs dfs -mkdir -p reads_2&
-#hdfs dfs -put $READS_1 reads_1&
-#hdfs dfs -put $READS_2 reads_2&
-#OR with BLAST
-#hdfs dfs -mkdir -p qseqs&
-#hdfs dfs -put $QSEQS qseqs/&
-
 LOCALINDEXPATH=/mnt/tmp
-HDFSURI=hdfs://namenode:8020 # HDFS URI
+HDFSURI=hdfs://node-1:8020 # HDFS URI
 NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starting from 1.
-MAX_QUERY_LEN=1000 # Set maximum sequence length for index queries (shoukd be > max read length)
+MAX_QUERY_LEN=1000 # Set maximum sequence length for index queries (should be > max read length or > BLAST alignment length)
+HDFSUSERDIR=$HDFSURI/user/root
+PGPATHLOCAL=$1 #directory containing pan-genome files in FASTA format
+PGPATHHDFS=$HDFSUSERDIR/pg
+DRLZPATHHDFS=$HDFSUSERDIR/drlz
+SPARKMASTER=yarn-client #For single node testing use local[n] where n is the amount of executors,
+N=26 #number of cluster nodes
+
+#Use paired-end reads with Bowtie etc. read aligners.
+#READS_1=$2
+#READS_2=$3
+
+#Use with BLAST
+QSEQS=$2 #path to single file in local fs
+hdfs dfs -mkdir -p $HDFSUSERDIR/qseqs
+hdfs dfs -put $QSEQS $HDFSUSERDIR/qseqs/
 
 hdfs dfs -mkdir -p $PGPATHHDFS
-date >> runtime.log
-echo "Started preparing pan-genome from VCF files with vcf2msa.."
-start=`date +%s`
-./vcf2msa.sh $PGPATHHDFS $PGPATHLOCAL $STDREFPATH $VCFPATH
-end=`date +%s`
-runtime=$((end-start))
-echo "vcf2msa runtime: ${runtime}" >> runtime.log
 
 date >> runtime.log
 echo "Loading files to HDFS..."
 
+#seq 1 $N | xargs -I{} -n 1 -P $N hdfs dfs -put $PGPATHLOCAL/{} $PGPATHHDFS
+hdfs dfs -put $PGPATHLOCAL/* $PGPATHHDFS
 
 date >> runtime.log
 echo "Starting DRLZ.." 
 start=`date +%s`
-seq 1 25 | xargs -I{} -n 1 -P 5 ./drlz_microbes.sh {} pg lz groupedfasta 0.33 &
+#seq 1 $N | xargs -I{} -n 1 -P $N ./drlz_microbes.sh {} pg lz groupedfasta 0.33 &
+./drlz_microbes.sh $PGPATHHDFS $DRLZPATHHDFS $HDFSUSERDIR/groupedfasta 0.33 $HDFSURI $SPARKMASTER
 runtime=$((end-start))
 echo "DRLZ compression time: ${runtime}" >> runtime.log
 
 date >> runtime.log
-echo "Starting distributed Kernelization.."
+echo "Starting distributed indexing.."
 start=`date +%s`
-seq 1 25 | xargs -I{} -n 1 -P 22 ssh -tt -o "StrictHostKeyChecking no" $NODE{} /opt/chic/index/index_partition.sh {} $PGPATHHDFS/ $DRLZPATHHDFS/ --kernelize
+
+hdfs dfs -mkdir $HDFSUSERDIR/blasted
+QFNAME=$(basename -- "$QSEQS")
+./distributed_indexing.sh $HDFSUSERDIR/groupedfasta $DRLZPATHHDFS $LOCALINDEXPATH $MAX_QUERY_LEN $HDFSURI $SPARKMASTER $HDFSUSERDIR/qseqs/$QFNAME
+
+#Using single merged index (useful with Bowtie. "makeblastdb" is limited to 4GB input)
+
+#echo "Merging indexes.."
+#start=`date +%s`
+#mkdir -p $LOCALINDEXPATH/merged/
+#seq 1 $N | xargs -I{} -n 1 -P $N scp -o "StrictHostKeyChecking no" $NODE{}:$LOCALINDEXPATH/*.fa.* $LOCALINDEXPATH/merged/
+
+#./merge_blast_index.sh $LOCALINDEXPATH/merged $N
+
+#/opt/dhpgindex/chic_index --threads=16  --kernel=BOWTIE2 --verbose=2 --indexing --lz-input-file=$LOCALINDEXPATH/merged/merged_phrases.lz $LOCALINDEXPATH/merged/ ${MAX_QUERY_LEN}
 
 end=`date +%s`
 runtime=$((end-start))
-echo "Kernelized in: ${runtime}" >> runtime.log
-
-date >> runtime.log
-echo "Merging and indexing merged kernel.."
-start=`date +%s`
-mkdir -p $LOCALINDEXPATH/merged/
-seq 1 25 | xargs -I{} -n 1 -P 25 scp -o "StrictHostKeyChecking no" $NODE{}:$LOCALINDEXPATH/part-${i}.fa.* $LOCALINDEXPATH/merged/
-#With BLAST use
-#./merge_blast_index.sh $LOCALINDEXPATH/merged
-./merge_chr_index.sh $LOCALINDEXPATH/merged
-
-#Comment the next line out with BLAST, indexing should have been done in parallel and merged in the previous step
-/opt/chic/index/chic_index --threads=16  --kernel=BOWTIE2 --verbose=2 --indexing --lz-input-file=$LOCALINDEXPATH/merged/merged_phrases.lz $LOCALINDEXPATH/merged/ ${MAX_QUERY_LEN}
-
-end=`date +%s`
-runtime=$((end-start))
-echo "Indexed in: ${runtime}" >> runtime.log
-
+echo "Indexed and aligned in: ${runtime}" >> runtime.log
 date >> runtime.log
 
-echo "Aligning reads.."
-start=`date +%s`
-/opt/chic/index/chic_align -v1 -t 16 -o /mnt/tmp/aligned.sam $LOCALINDEXPATH/merged/merged $READS_1 $READS_2
-/opt/samtools/samtools view -F4 /mnt/tmp/aligned.sam > /mnt/tmp/mapped.sam
-end=`date +%s`
-runtime=$((end-start))
-echo "Aligned reads in: ${runtime}" >> runtime.log
+hdfs dfs -get $HDFSUSERDIR/blasted
+echo "Alignments downloaded from HDFS"
 
-#echo "Starting distributed alignment (per partition with BLAST).."
+
+#echo "Aligning sequences.."
 #start=`date +%s`
-#./dist_chic_blast.sh $PGPATHHDFS
+#Align to single index
+#/opt/dhpgindex/chic_align -v1 -t 16 -o /mnt/tmp/aligned $LOCALINDEXPATH/merged/merged $READS_1 $READS_2 #with Bowtie an paired-end reads use $READS_1 $READS_2
+#/opt/samtools/samtools view -F4 /mnt/tmp/aligned.sam > /mnt/tmp/mapped.sam
 #end=`date +%s`
 #runtime=$((end-start))
-#echo "Aligned in : ${runtime}" >> runtime.log
-#
-#echo "Downloading alignment files to local FS.."
-#start=`date +%s`
-#
-#mkdir -p $LOCALINDEXPATH/sams/
-#seq 1 25 | xargs -I{} -n 1 -P 22 scp -o "StrictHostKeyChecking no" $NODE{}:$LOCALINDEXPATH/mapped $LOCALINDEXPATH/mapped
-#
-#end=`date +%s`
-#runtime=$((end-start))
-#echo "Downlaoded in : ${runtime}" >> runtime.log
+#echo "Aligned sequences in: ${runtime}" >> runtime.log
+
 
 
                                                  

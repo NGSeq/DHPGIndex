@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
 LOCALMERGEDINDEXPATH=$1
+N=$2
 DIR=$( pwd )
 
 dbs=""
 cd $LOCALMERGEDINDEXPATH
-for i in {01..25}
+for i in {01..$N}
   do
    dbs=${dbs} "part-"${i}".fa "
 

@@ -65,6 +65,7 @@ object DistributedRLZGroupTax {
 
     println("Started distributed RLZ")
     splitted.foreach{group=>
+
       println("Started compressing tax group"+ group._1)
       val completes = group._2.filter(g=>g._5.toLowerCase.contains("complete genome"))
       var refs = ""

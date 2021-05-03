@@ -33,7 +33,7 @@ or
 Manually with minimal configuration by following the instructions in sbin/spark-hadoop-init.sh and running the script.
 
 
-Experimenting
+Experimenting with human pan-genome (default is Bowtie index)
 ---
 ### Preparing data
 ---
@@ -43,7 +43,7 @@ The whole data set includes 2506 samples generating 13 TB pangenome! You can spl
 
 or
 
-Use allready assembled sequences and skip the vcf2multialign stage (uncomment lines in launch.sh). Copy the assembled sequences in /data/pangenome/.
+Use already assembled sequences and skip the vcf2multialign stage (comment out lines in pipeline_hg.sh). Copy the assembled sequences in /data/pangenome/.
 
 ---
 ### Modify variables
@@ -51,7 +51,7 @@ Use allready assembled sequences and skip the vcf2multialign stage (uncomment li
 
 To run the whole pipeline bash scirpt `pipeline_hg.sh` is used.
 The initial configuration assumes at least 22 worker nodes for running chromosomes 1-22 in some stages in parallel (if less used only the numbered chromosomes are assembled).
-Modify static paths to fit your configuration in the launch.sh
+Modify static paths to fit your configuration in the `pipeline_hg.sh`
 
 LOCALINDEXPATH=/mnt/tmp # Should be same as was created with the compile.sh
 
@@ -73,6 +73,37 @@ NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starti
 Here the first parameter is a local filesystem folder where the pangenome sequence files are generated to.
 The pangenome data is automatically uploaded to the HDFS under the same folder.
 The next two parameters are are local paired-end read files that are are also uploaded to HDFS and aligned eventually against the pan genome index.
+
+Experimenting with microbial pan-genome (default is BLAST index)
+---
+### Preparing data
+---
+Download microbial genomes in FASTA format e.g. from NCBI assembly database to local filesystem under /data/pangenome/ folder. 
+
+---
+### Modify variables
+---
+
+To run the whole pipeline bash scirpt `pipeline_microbes.sh` is used.
+The initial configuration assumes at least 25 worker nodes.
+Modify the number of cluster nodes and static paths to fit your configuration in the `pipeline_microbes.sh` file.
+
+LOCALINDEXPATH=/mnt/tmp # Should be same as was created with the compile.sh
+
+HDFSURI=hdfs://namenode:8020
+
+NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starting from 1.
+
+---
+### Launching
+---
+
+```bash
+./pipeline_microbes.sh /data/pangenome/ /data/querysequences.fna
+```
+Here the first parameter is a local filesystem folder where the pangenome sequence files are generated to.
+The pangenome data is automatically uploaded to the HDFS under the same folder.
+The second parameter is the file including query sequences that are aligned eventually against the created pan genomic index.
 
 Note
 ------------------

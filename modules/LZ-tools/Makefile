@@ -1,9 +1,9 @@
 SHELL = /bin/sh
 
 CC = g++
-CPPFLAGS = -Wall -static -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG
+CPPFLAGS = -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG
 #CPPFLAGS = -Wall -static -Wextra -pedantic -Wshadow -g2 -ggdb
-LIB=/media/dev/dev/panquery/modules/chic/ext/sdsl-local-install/lib/libsdsl.a
+LIB=../chic/ext/sdsl-local-install/lib/libsdsl.a
 
 all: decode decode32 debug_phrases shrink_ints merge_with_offsets merge_meta_offsets merge_vars merge_limits
 

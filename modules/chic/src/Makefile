@@ -10,7 +10,7 @@ PARANOID=-pedantic -Wall -Wextra -Wcast-align -Wctor-dtor-privacy -Wdisabled-opt
 CXX_FLAGS= -g3 -std=c++11 -pthread -Wall -Wextra  -O9 -DNDEBUG -DPROJECT_ROOT="\"$(PROJECT_ROOT)\""
 
 INCLUDES=-isystem$(INC_DIR)
-LIB=$(LIB_DIR)/libsdsl.a $(LIB_DIR)/libdivsufsort.a $(LIB_DIR)/libdivsufsort64.a /usr/hdp/3.1.0.0-78/hadoop/lib/native/libhdfs.a /usr/lib/jvm/java-1.8.0-openjdk/jre/lib/amd64/server/libjvm.so -lz
+LIB=$(LIB_DIR)/libsdsl.a $(LIB_DIR)/libdivsufsort.a $(LIB_DIR)/libdivsufsort64.a /opt/hadoop/lib/native/libhdfs.a /usr/lib/jvm/java-1.8.0-openjdk/jre/lib/amd64/server/libjvm.so -lz
 LZ_FILES=../ext/LZ/LZscan/algorithm/lcp.cpp ../ext/LZ/LZscan/algorithm/parse.cpp ../ext/LZ/LZscan/algorithm/divsufsort.c ../ext/LZ/LZscan/algorithm/common.cpp
 
 OBJECTS=utils.o RangeReporting.o BookKeeper.o fasta.o KernelManagerFMI.o KernelManagerBWA.o KernelManagerBowTie2.o KernelManagerBLAST.o HybridLZIndex.o LempelZivParser.o

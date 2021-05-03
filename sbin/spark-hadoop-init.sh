@@ -1,41 +1,49 @@
 #!/usr/bin/env bash
 
 CUR=pwd
+N=26 #The number of cluster nodes. Nodes muste be named node-N
+
 ###### USE ONLY FOR TESTING PURPOSES. USE AT YOUR OWN RISK. ######
 
 #Assume we have 26 nodes having hostnames node-1...node-26 and we are logged in as root user
 #Hadoop is installed in folder /opt/hadoop and Spark in /opt/spark on every node
 
 #####Get Hadoop and Spark
-wget https://archive.apache.org/dist/hadoop/core/hadoop-2.7.3/hadoop-2.7.3.tar.gz -O /opt/hadoop-2.7.3.tar.gz
-tar -xf /opt/hadoop-2.7.3.tar.gz
-mv /opt/hadoop-2.7.3 /opt/hadoop
+wget https://archive.apache.org/dist/hadoop/core/hadoop-2.7.3/hadoop-2.7.3.tar.gz
+tar -xf hadoop-2.7.3.tar.gz
+mv hadoop-2.7.3 /opt/hadoop
 
-wget http://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2-bin-hadoop2.7.tgz -O /opt/spark-2.3.2-bin-hadoop2.7.tgz
-tar -xf /opt/spark-2.3.2-bin-hadoop2.7.tgz
-mv /opt/spark-2.3.2-bin-hadoop2.7 /opt/spark
+wget http://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2-bin-hadoop2.7.tgz
+tar -xf spark-2.3.2-bin-hadoop2.7.tgz
+mv spark-2.3.2-bin-hadoop2.7 /opt/spark
 
-wget https://github.com/BenLangmead/bowtie2/releases/download/v2.4.2/bowtie2-2.4.2-linux-x86_64.zip -O /opt/bowtie2-2.4.2-linux-x86_64.zip
-unzip /opt/bowtie2-2.4.2-linux-x86_64.zip
-mv /opt/bowtie2-2.4.2-linux-x86_64 /opt/bowtie
+wget https://github.com/BenLangmead/bowtie2/releases/download/v2.4.2/bowtie2-2.4.2-linux-x86_64.zip
+unzip bowtie2-2.4.2-linux-x86_64.zip
+mv bowtie2-2.4.2-linux-x86_64 /opt/bowtie
 
-wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.8.0alpha/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz -O /opt/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz
-tar -xf /opt/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz
-mv /opt/ncbi-blast-2.8.0-alpha+-x64-linux /opt/blast
+wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.8.0alpha/ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz
+tar -xf ncbi-blast-2.8.0-alpha+-x64-linux.tar.gz
+mv ncbi-blast-2.8.0+ /opt/blast
 
-wget https://github.com/samtools/samtools/releases/download/1.11/samtools-1.11.tar.bz2 -O /opt/samtools-1.11.tar.bz2
-tar -xf /opt/samtools-1.11.tar.bz2
-mv /opt/samtools-1.11.tar.bz2  /opt/samtools
+sudo yum install -y ncurses-devel
+wget https://github.com/samtools/samtools/releases/download/1.11/samtools-1.11.tar.bz2
+tar -xf samtools-1.11.tar.bz2
+mv samtools-1.11 /opt/samtools
 cd /opt/samtools
-make /opt/samtools
+make
+
 cd $CUR
 
+# Modify and Add to .bashrc if needed
+export PATH=/opt/hadoop/bin:/opt/hadoop/sbin:/opt/bowtie2:/opt/spark/bin:/opt/bwa/:/opt/blast/bin/:$PATH
+export JAVA_HOME=/usr/lib/jvm/jre-1.8.0-openjdk
+export HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop/
 
 
-#Modify hosts, HDFS dirs, memory options in /opt/hadoop/etc/hadoop/core-site.xml, /opt/hadoop/etc/hadoop/hdfs-site.xml, /opt/hadoop/etc/hadoop/yarn-site.xml and /opt/spark/conf/spark-defaults.conf
+#Modify ihosts, HDFS dirs, memory options in /opt/hadoop/etc/hadoop/core-site.xml, /opt/hadoop/etc/hadoop/hdfs-site.xml, /opt/hadoop/etc/hadoop/yarn-site.xml and /opt/spark/conf/spark-defaults.conf
 #add all nodes to /etc/hosts and /opt/hadoop/etc/hadoop/workers file
 
-## Minimal configurations
+## Minimal cluster configurations
 
 ##### /opt/hadoop/etc/hadoop/core-site.xml
 #<configuration>
@@ -84,12 +92,12 @@ cd $CUR
 #    </property>
 #    <property>
 #            <name>yarn.nodemanager.resource.memory-mb</name>
-#            <value>5000</value>
+#            <value>100000</value>
 #    </property>
 #
 #    <property>
 #            <name>yarn.scheduler.maximum-allocation-mb</name>
-#            <value>30000</value>
+#            <value>100000</value>
 #    </property>
 #
 #    <property>
@@ -148,10 +156,10 @@ export PATH=/opt/hadoop/bin:/opt/hadoop/sbin:/opt/spark/bin:$PATH
 #export JAVA_HOME=/usr/lib/jvm/jre-1.8.0-openjdk #Modify and uncomment if java is not found
 
 #Generate ssh key
-ssh-keygen
+ssh-keygen #Press enter twice (use no passphrase)
 #copy ssh key to all nodes
 for i in {1..26}; do ssh-copy-id -i $HOME/.ssh/id_rsa.pub root@node-$i; done
-
+cat $HOME/.ssh/id_rsa.pub >> $HOME/.ssh/authorized_keys
 
 distribute(){
 
