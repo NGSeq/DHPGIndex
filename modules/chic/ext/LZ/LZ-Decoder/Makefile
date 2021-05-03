@@ -1,8 +1,8 @@
 SHELL = /bin/sh
 
 CC = g++
-CPPFLAGS = -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG
-#CPPFLAGS = -Wall -static -Wextra -pedantic -Wshadow -g2
+CPPFLAGS = -Wall  -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG
+#CPPFLAGS = -Wall  -Wextra -pedantic -Wshadow -g2
 
 all: decode debug_phrases
 

@@ -39,10 +39,11 @@ class KernelManagerBLAST : public KernelManager {
                      int n_threads,
                      int _verbose);
   KernelManagerBLAST(uchar * text,
-                   size_t text_len,
-                   int n_threads,
-                   char * _kernel_text_filename,
-                   int _verbose);
+                     size_t text_len,
+                     char * _kernel_text_filename,
+                     int _n_threads,
+                     int _max_memory_MB,
+                     int _verbose);
   void CreateKernelTextFile(uchar * kernel_text, size_t kernel_text_len);
   void DeleteKernelTextFile();
   void ComputeSize();
@@ -54,11 +55,12 @@ class KernelManagerBLAST : public KernelManager {
 
 
   // Queries and accessors:
-  vector<Occurrence> LocateOccsFQ(char * query_filename,
-                                  char * mates_filename,
-                                  bool retrieve_all,
-                                  bool single_file_paired,
-                                  vector<string> kernel_options) const;
+
+  string  LocateOccsFQ(char * query_filename,
+                         char * mates_filename,
+                         bool retrieve_all,
+                         bool single_file_paired,
+                         vector<string> kernel_options) const;
   vector<Occurrence> LocateOccs(string query) const;
 
     uint GetSizeBytes() const;
@@ -71,7 +73,7 @@ class KernelManagerBLAST : public KernelManager {
     return kernel_text_len;
   }
   */
-  static vector<Occurrence> SamOccurrences(const char * sam_filename);
+ // static vector<Occurrence> SamOccurrences(const char * sam_filename);
 
  private:
   // Variables:

@@ -1,3 +1,0 @@
-* The algorithm of choice to parse the reference is hard-coded. Do proper calculation to decide which algorithm use.
-* Stop creating a different file for the reference. This a huge inefficiency.
-* Improve read/write. It is done sequentially, there is a lot of room to improve times there.

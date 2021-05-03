@@ -1,25 +1,34 @@
 /*
-   Daniel Valenzuela
-   Simple buffer that offer an interface to go character by character from an array or from a file.
-   */
+	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
+
+	 This file is part of CHIC aligner.
+
+	 CHIC aligner is free software: you can redistribute it and/or modify
+	 it under the terms of the GNU General Public License as published by
+	 the Free Software Foundation, either version 3 of the License, or
+	 (at your option) any later version.
+
+	 CHIC aligner is distributed in the hope that it will be useful,
+	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 GNU General Public License for more details.
+
+	 You should have received a copy of the GNU General Public License
+	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef MYBUFFERFASTAFILE_H_ 
 #define MYBUFFERFASTAFILE_H_ 
 
 #include "MyBuffer.h"
-#include "../ext/LZ/RLZ_parallel/src/fastametadata.hpp"
+#include "../ext/fastametadata.hpp"
 
 using FMD::FastaMetaData;
 
 class MyBufferFastaFile : public MyBuffer{
  public:
   MyBufferFastaFile(char * filename) {
-      try {
-
-
-
-      fprintf(stdout, " FASTA");
-
-      metadata = new FastaMetaData();
+    metadata = new FastaMetaData();
     metadata->Load(string(filename)+".metadata");
     line_len = metadata->GetLineLength();
     fs.open(filename);
@@ -27,9 +36,6 @@ class MyBufferFastaFile : public MyBuffer{
     seq_i = 0;
     file_i = metadata->SeqposToFilepos(0);
     fs.seekg((int64_t)file_i);
-      }catch(const char *e){
-          cout << "Exception: " << e << " "<< endl;
-      }
   }
 
   bool AmGood() {
@@ -53,7 +59,7 @@ class MyBufferFastaFile : public MyBuffer{
   inline uchar GetChar() {
     //ASSERT(AmGood());
     if(!fs.good()) {
-      cout << "A PROBLEM OCCURRED WITH FS!! " << endl;
+      cerr << "A PROBLEM OCCURRED WITH FS!! " << endl;
       exit(EXIT_FAILURE);
     }
     uchar curr_char = fs.get();

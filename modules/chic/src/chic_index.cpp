@@ -8,28 +8,29 @@
 
 void suggest_help();
 void suggest_help(char ** argv) {
-  cout << "For help, type " << argv[0] << " --help" << endl;
+  cerr << "For help, type " << argv[0] << " --help" << endl;
 }
 
 void print_help();
 void print_help() {
-  cout << "Compressed Hybrid Index v0.1 beta" << endl;
-  cout << "chic_index builds the indexing data structure for INPUT_FILE" << endl;
-  cout << "so that it can allign reads up to MAX_QUERY_LEN" << endl;
-  cout << endl;
-  cout << "Ussage: chic_index [OPTIONS] INPUT_FILE MAX_QUERY_LEN" << endl;
-  cout << endl;
-  cout << "Options:" << endl;
-  cout << "--kernel=[FMI,BWA,BOWTIE2] default is FMI" << endl;
-  cout << "--lz-parsing-method=[IM,EM,RLZ] default is IM" << endl;
-  cout << "--lz-input-file=PARSE.LZ In case you have the lz parsing of the input." << endl;
-  cout << "--max-edit-distance (default = 0)" << endl;
-  cout << "-o --output=INDEX_BASENAME Default: INPUT_FILE" << endl;
-  cout << "-v --verbose=LEVEL " << endl;
-  cout << "-m --mem=(MAX MEM IN MB)" << endl;
-  cout << "-t --threads=(number of threads)" << endl;
-  cout << "-r --rlz-ref-size=(Prefix size for RLZ method)" << endl;
-  cout << "--help " << endl;
+  cerr << "Compressed Hybrid Index v0.1 beta" << endl;
+  cerr << "chic_index builds the indexing data structure for INPUT_FILE" << endl;
+  cerr << "so that it can allign reads up to MAX_QUERY_LEN" << endl;
+  cerr << endl;
+  cerr << "Ussage: chic_index [OPTIONS] INPUT_FILE MAX_QUERY_LEN" << endl;
+  cerr << endl;
+  cerr << "Options:" << endl;
+  cerr << "--kernel=[FMI,BWA,BOWTIE2] default is FMI" << endl;
+  cerr << "--lz-parsing-method=[IM,EM,RLZ,RELZ] default is IM" << endl;
+  cerr << "--lz-input-plain-file=PARSE.LZ In case you have the lz parsing of the input (as pairs of 64 bits integers)" << endl;
+  cerr << "--lz-input-vbyte-file=PARSE.LZ In case you have the lz parsing of the input (vbyte encoded)" << endl;
+  cerr << "--max-edit-distance (default = 0)" << endl;
+  cerr << "-o --output=INDEX_BASENAME Default: INPUT_FILE" << endl;
+  cerr << "-v --verbose=LEVEL " << endl;
+  cerr << "-m --mem=(MAX MEM IN MB)" << endl;
+  cerr << "-t --threads=(number of threads)" << endl;
+  cerr << "-r --rlz-ref-size=(Prefix size for RLZ method)" << endl;
+  cerr << "--help " << endl;
 }
 
 
@@ -52,11 +53,10 @@ int main(int argc, char **argv) {
       /* These options don’t set a flag.
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
-      {"kernelize",    required_argument, 0, 'Z'},
       {"indexing",    required_argument, 0, 'I'},
-      {"hdfspath",    required_argument, 0, 'H'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
-      {"lz-input-file",    required_argument, 0, 'F'},
+      {"lz-input-plain-file",    required_argument, 0, 'F'},
+      {"lz-input-vbyte-file",    required_argument, 0, 'G'},
       {"max-edit-distance",    required_argument, 0, 'k'},
       {"output",    required_argument, 0, 'o'},
       {"verbose",    required_argument, 0, 'v'},
@@ -69,8 +69,7 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:Z:I:H:M:F:k:o:v:m:r:t:h", long_options, &option_index);
-      printf(" with arg %s", optarg);
+    int c = getopt_long(argc, argv, "K:I:M:F:G:k:o:v:m:r:t:h", long_options, &option_index);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -106,16 +105,8 @@ int main(int argc, char **argv) {
         }
         break;
 
-        case 'Z':
-            parameters->kernelizeonly = 1;
-            break;
-
-        case 'I':
+      case 'I':
             parameters->indexingonly = 1;
-            break;
-
-        case 'H':
-            parameters->hdfs_path = optarg;
             break;
 
       case 'M':
@@ -126,18 +117,24 @@ int main(int argc, char **argv) {
           parameters->lz_method = LZMethod::EXTERNAL_MEMORY;
         } else if (strcmp(optarg, "RLZ") == 0) {
           parameters->lz_method = LZMethod::RLZ;
+        } else if (strcmp(optarg, "RELZ") == 0) {
+          parameters->lz_method = LZMethod::RELZ;
         } else {
           print_help();
           delete (parameters);
           exit(0);
         }
         break;
-      
+
       case 'F':
         parameters->input_lz_filename = optarg;
-        parameters->lz_method=LZMethod::INPUT;
+        parameters->lz_method = LZMethod::INPUT_PLAIN;
         break;
 
+      case 'G':
+        parameters->input_lz_filename = optarg;
+        parameters->lz_method = LZMethod::INPUT_VBYTE;
+        break;
 
       case 'h':
         print_help();
@@ -182,7 +179,7 @@ int main(int argc, char **argv) {
   }
 
   if ((argc - optind) != 2) {
-    cout << "Incorrect number of arguments." << endl;
+    cerr << "Incorrect number of arguments." << endl;
     suggest_help(argv);
     exit(-1);
   }
@@ -195,29 +192,26 @@ int main(int argc, char **argv) {
 
   ///////////////////////////////////////////////////////////////
 
-  cout << "Input filename: " << parameters->input_filename << endl;
-  cout << "maximum pattern length: " << parameters->max_query_len << endl;
+  cerr << "Input filename: " << parameters->input_filename << endl;
+  cerr << "maximum pattern length: " << parameters->max_query_len << endl;
 
   ///////////////////////////////////////////////////////////////
   long double t1, t2;
 
   t1 = Utils::wclock();
-  //TODO: separate kernelize and indexing, apply kernelization to spark drlz code (kernel per chr)
-    cout << "hdfspath: " << parameters->hdfs_path << endl;
   HybridLZIndex * index = new HybridLZIndex(parameters);
   index->Save();
   t2 = Utils::wclock();
 
-    fprintf(stdout, " ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-    fprintf(stdout, "Index succesfully built in: %d seconds", (t2-t1) );
-
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cerr << "Index succesfully built in: "<< (t2-t1) << " seconds. " << endl;
   if (t2-t1 > 60) {
-    cout << "Index succesfully built in: "<< (t2-t1)/60 << " minutes. " << endl;
+    cerr << "Index succesfully built in: "<< (t2-t1)/60 << " minutes. " << endl;
   }
   if (t2-t1 > 3600) {
-    cout << "Index succesfully built in: "<< (t2-t1)/3600 << " hours. " << endl;
+    cerr << "Index succesfully built in: "<< (t2-t1)/3600 << " hours. " << endl;
   }
-    fprintf(stdout, " ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
   delete(index);
   delete(parameters);
   exit(0);

@@ -1,2 +1,0 @@
-More exigent test: expected matches are 5, 2 have unique position, the others are repeated in the three chromosomes (at the same position),
-so they are easily verified with a simple regexp

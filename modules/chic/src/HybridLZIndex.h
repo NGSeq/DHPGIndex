@@ -1,3 +1,22 @@
+/*
+	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
+
+	 This file is part of CHIC aligner.
+
+	 CHIC aligner is free software: you can redistribute it and/or modify
+	 it under the terms of the GNU General Public License as published by
+	 the Free Software Foundation, either version 3 of the License, or
+	 (at your option) any later version.
+
+	 CHIC aligner is distributed in the hope that it will be useful,
+	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 GNU General Public License for more details.
+
+	 You should have received a copy of the GNU General Public License
+	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef HYBRID_LZINDEX_H_
 #define HYBRID_LZINDEX_H_
 
@@ -11,7 +30,6 @@
 #include "MyBufferPlainFile.hpp"
 #include "MyBufferMemSeq.hpp"
 #include "MyBufferFastaFile.hpp"
-#include "MyBufferHDFS.hpp"
 #include <streambuf>
 #include <ostream>
 #include <sdsl/util.hpp>
@@ -20,8 +38,6 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/rank_support.hpp>
 #include <sdsl/select_support.hpp>
-#include "./jni/hdfs.h"
-
 
 using std::ostream;
 
@@ -66,6 +82,10 @@ class HybridLZIndex {
   LZMethod GetLZMethod() {
     return lz_method;
   }
+  
+  KernelType GetKernelType() {
+    return kernel_type;
+  }
 
   int GetMaxMemoryMB() {
     return max_memory_MB;
@@ -83,8 +103,6 @@ class HybridLZIndex {
     return rlz_ref_len_MB; 
   }
   void ValidateParams(BuildParameters * params);
-  void WriteKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len);
-  void WriteToHDFS(uchar * text);
   /////////////////////
   // INDEX QUERIES
 /////////////////////
@@ -95,40 +113,18 @@ class HybridLZIndex {
               vector<string> kernel_options,
               ostream& out_stream) const;
 
-  void FindFQ2(char * alignment_filename,
-                bool single_file_paired,
-                SecondaryReportType secondary_report,
-                vector<string> kernel_options,
-                ostream& out_stream) const;
-
-  void FindALL(vector<Occurrence> my_occs,
-                char * query_filename,
-                char * mates_filename,
-                 bool single_file_paired,
-                 SecondaryReportType secondary_report,
-                 vector<string> kernel_options,
-                 ostream& out_stream) const;
-
   void Find(vector<uint64_t> * ans, string query) const;
-  void Find(vector<string> *ans, vector<uint64_t> position, uint64_t range) const;
   void DetailedSpaceUssage() const;
   uint GetSizeBytes() const;
   void Save() const;
 
-    void FindPatterns(vector<string> *ans, string query) const;
-
-    void FindPatterns(vector<Occurrence> *ans, string query) const;
-
-private:
+ private:
 
   void ComputeSize();
   void Build();
   void SetFileNames();
   void GetLZPhrases(vector<pair<uint64_t, uint>> * lz_phrases_ptr);
   void Kernelize();
-  void InitKernelizeonly();
-  void Kernelizeonly();
-  void IndexingOnly();
   void IndexKernel();
   void Indexing();
   void MakeKernelString(MyBuffer *is, uchar ** kernel_ans, uint64_t ** tmp_limits_kernel_ans);
@@ -143,23 +139,16 @@ private:
   // Find:
   void FindPrimaryOccs(vector<Occurrence> * ans, string query) const;
   void searchSecondaryOcc(vector<Occurrence> * ans, uint *nSec = NULL) const;
+  
+  void searchSecondaryOcc(Occurrence * kernel_occs,
+                          size_t kernel_occs_len,
+                          vector<Occurrence> * second) const;
 
-  void FindPrimaryOccsFQ(vector<Occurrence> * ans,
-                         vector<Occurrence> * unmapped,
-                         SecondaryReportType secondary_report,
-                         char * query_filename,
-                         char * mates_filename,
-                         bool single_file_paired,
-                         vector<string> kernel_options) const;
-  void FindPrimaryOccsFQ2(vector<Occurrence> * ans,
-                           vector<Occurrence> * unmapped,
-                           SecondaryReportType secondary_report,
-                           char * alignment_filename,
-                           bool single_file_paired,
-                           vector<string> kernel_options) const;
+  void KernelOccsToPrimaryOccsFQ(Occurrence  * kernel_occs,
+                                 size_t kernel_occs_len,
+                                 SecondaryReportType secondary_report) const;
 
   void CreateSamRecordsForTrulyLostAlignments(vector<Occurrence> * lost_occs,
-                                              vector<Occurrence> * unmapped,
                                               vector<Occurrence> * ans,
                                               bool retrieve_all) const;
 
@@ -209,7 +198,6 @@ private:
   uchar * tmp_seq;  // ptr to seq, in case it was provided.
 
   char * text_filename;
-  char * hdfs_path;
   char * index_prefix;
   char * input_lz_filename;
   // intermediate files for index construction
@@ -222,8 +210,6 @@ private:
   char variables_filename[200];
 
   bool InspectIndex();
-hdfsFS fs;
-
 };
 
 #endif /* LZ77_MINDEX_H_ */

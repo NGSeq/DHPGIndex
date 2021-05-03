@@ -1,3 +1,0 @@
-RLZ sequential parser giving the correct parameters to the parallell version: only one worker per chunk; and only one thread.
-
-Still, if the given memory limit is not enough to fit the entire input text, some phrase cuts are introduced...

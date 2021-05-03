@@ -1,4 +1,4 @@
-SUBDIRS = EM-LZscan-0.2/src LZ-Decoder RLZ_parallel/src
+SUBDIRS = EM-LZscan-0.2/src LZ-Decoder
 .PHONY: subdirs $(SUBDIRS) clean
 
 subdirs: $(SUBDIRS)

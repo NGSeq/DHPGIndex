@@ -37,4 +37,5 @@ SamReader::SamReader(string _filename, size_t _chunk_size, int _n_threads, int _
 
 SamReader::~SamReader() {
   my_fstream.close();
+  Utils::DeleteTmpFile(filename);
 }

@@ -39,10 +39,10 @@
 #define uint unsigned int
 #endif
 
-enum class KernelType { BWA, BOWTIE2, BLAST, FMI };
+enum class KernelType { BWA, BOWTIE2, FMI, BLAST };
 enum class InputType { PLAIN, FQ };
 enum class SecondaryReportType { ALL, LZ, NONE };
-enum class LZMethod {IN_MEMORY, EXTERNAL_MEMORY, RLZ, INPUT};
+enum class LZMethod {IN_MEMORY, EXTERNAL_MEMORY, RLZ, RELZ, INPUT_PLAIN, INPUT_VBYTE};
 
 typedef struct {
 	char * input_filename;
@@ -55,6 +55,7 @@ typedef struct {
 	uint max_query_len;
 	uint max_edit_distance;
 	KernelType kernel_type;
+    int indexingonly;
 	int verbose;
 } BuildParameters;
 

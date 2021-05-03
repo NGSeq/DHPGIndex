@@ -1,4 +1,22 @@
-// Copyright Daniel Valenzuela
+/*
+	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
+
+	 This file is part of CHIC aligner.
+
+	 CHIC aligner is free software: you can redistribute it and/or modify
+	 it under the terms of the GNU General Public License as published by
+	 the Free Software Foundation, either version 3 of the License, or
+	 (at your option) any later version.
+
+	 CHIC aligner is distributed in the hope that it will be useful,
+	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 GNU General Public License for more details.
+
+	 You should have received a copy of the GNU General Public License
+	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -8,26 +26,27 @@
 
 void suggest_help();
 void suggest_help(char ** argv) {
-  cout << "For  help, type " << argv[0] << " --help" << endl;
+  cerr << "For help, type " << argv[0] << " --help" << endl;
 }
 
 void print_help();
 void print_help() {
-  cout << "Ussage: build_index [OPTIONS] INPUT_FILE MAX_QUERY_LEN" << endl;
-  cout << "Builds an index[1,2] for INPUT_FILE " << endl;
-  cout << "It answers pattern matching queries of length up to MAX_QUERY_LEN" << endl;
-  cout << endl;
-  cout << "Options:" << endl;
-  cout << "--kernel=[FMI,BWA,BOWTIE2] default is FMI" << endl;
-  cout << "--lz-parsing-method=[IM,EM,RLZ] default is IM" << endl;
-  cout << "--lz-input-file=PARSE.LZ In case you have the lz parsing of the input." << endl;
-  cout << "--max-edit-distance (default = 0)" << endl;
-  cout << "-o --output=INDEX_BASENAME Default: INPUT_FILE" << endl;
-  cout << "-v --verbose=LEVEL " << endl;
-  cout << "-m --mem=(MAX MEM IN MB)" << endl;
-  cout << "-t --threads=(number of threads)" << endl;
-  cout << "-r --rlz-ref-size=(Prefix size for RLZ method)" << endl;
-  cout << "--help " << endl;
+  cerr << "Ussage: build_index [OPTIONS] INPUT_FILE MAX_QUERY_LEN" << endl;
+  cerr << "Builds an index[1,2] for INPUT_FILE " << endl;
+  cerr << "It answers pattern matching queries of length up to MAX_QUERY_LEN" << endl;
+  cerr << endl;
+  cerr << "Options:" << endl;
+  cerr << "--kernel=[FMI,BWA,BOWTIE2] default is FMI" << endl;
+  cerr << "--lz-parsing-method=[IM,EM,RLZ,RELZ] default is IM" << endl;
+  cerr << "--lz-input-plain-file=PARSE.LZ In case you have the lz parsing of the input (as pairs of 64 bits integers)" << endl;
+  cerr << "--lz-input-vbyte-file=PARSE.LZ In case you have the lz parsing of the input (vbyte encoded)" << endl;
+  cerr << "--max-edit-distance (default = 0)" << endl;
+  cerr << "-o --output=INDEX_BASENAME Default: INPUT_FILE" << endl;
+  cerr << "-v --verbose=LEVEL " << endl;
+  cerr << "-m --mem=(MAX MEM IN MB)" << endl;
+  cerr << "-t --threads=(number of threads)" << endl;
+  cerr << "-r --rlz-ref-size=(Prefix size for RLZ method)" << endl;
+  cerr << "--help " << endl;
 }
 
 
@@ -50,11 +69,9 @@ int main(int argc, char **argv) {
       /* These options don’t set a flag.
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
-      {"kernelize",    required_argument, 0, 'Z'},
-      {"indexing",    required_argument, 0, 'I'},
-      {"hdfspath",    required_argument, 0, 'H'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
-      {"lz-input-file",    required_argument, 0, 'F'},
+      {"lz-input-plain-file",    required_argument, 0, 'F'},
+      {"lz-input-vbyte-file",    required_argument, 0, 'G'},
       {"max-edit-distance",    required_argument, 0, 'k'},
       {"output",    required_argument, 0, 'o'},
       {"verbose",    required_argument, 0, 'v'},
@@ -67,7 +84,7 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:Z:I:H:M:F:k:o:v:m:r:t:h", long_options, &option_index);
+    int c = getopt_long(argc, argv, "K:M:F:G:k:o:v:m:r:t:h", long_options, &option_index);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -88,9 +105,7 @@ int main(int argc, char **argv) {
         if (strcmp(optarg, "BWA") == 0) {
           parameters->kernel_type = KernelType::BWA;;
         } else if (strcmp(optarg, "BOWTIE2") == 0) {
-          parameters->kernel_type = KernelType::BOWTIE2;
-        } else if (strcmp(optarg, "BLAST") == 0) {
-            parameters->kernel_type = KernelType::BLAST;
+          parameters->kernel_type = KernelType::BOWTIE2;;
         } else if (strcmp(optarg, "FMI") == 0) {
           parameters->kernel_type = KernelType::FMI;;
         } else {
@@ -99,15 +114,6 @@ int main(int argc, char **argv) {
           exit(0);
         }
         break;
-        case 'Z':
-            parameters->kernelizeonly = 1;
-            break;
-        case 'I':
-            parameters->indexingonly = 1;
-            break;
-        case 'H':
-            parameters->hdfs_path = optarg;
-            break;
 
       case 'M':
         ASSERT(parameters->input_lz_filename == NULL);
@@ -117,18 +123,24 @@ int main(int argc, char **argv) {
           parameters->lz_method = LZMethod::EXTERNAL_MEMORY;
         } else if (strcmp(optarg, "RLZ") == 0) {
           parameters->lz_method = LZMethod::RLZ;
+        } else if (strcmp(optarg, "RELZ") == 0) {
+          parameters->lz_method = LZMethod::RELZ;
         } else {
           print_help();
           delete (parameters);
           exit(0);
         }
         break;
-      
+
       case 'F':
         parameters->input_lz_filename = optarg;
-        parameters->lz_method=LZMethod::INPUT;
+        parameters->lz_method = LZMethod::INPUT_PLAIN;
         break;
 
+      case 'G':
+        parameters->input_lz_filename = optarg;
+        parameters->lz_method = LZMethod::INPUT_VBYTE;
+        break;
 
       case 'h':
         print_help();
@@ -173,7 +185,7 @@ int main(int argc, char **argv) {
   }
 
   if ((argc - optind) != 2) {
-    cout << "Incorrect number of arguments." << endl;
+    cerr << "Incorrect number of arguments." << endl;
     suggest_help(argv);
     exit(-1);
   }
@@ -186,8 +198,8 @@ int main(int argc, char **argv) {
 
   ///////////////////////////////////////////////////////////////
 
-  cout << "Input filename: " << parameters->input_filename << endl;
-  cout << "maximum pattern length: " << parameters->max_query_len << endl;
+  cerr << "Input filename: " << parameters->input_filename << endl;
+  cerr << "maximum pattern length: " << parameters->max_query_len << endl;
 
   ///////////////////////////////////////////////////////////////
   long double t1, t2;
@@ -197,9 +209,9 @@ int main(int argc, char **argv) {
   index->Save();
   t2 = Utils::wclock();
 
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cout << "Index succesfully built in: "<< (t2-t1) << " seconds. " << endl;
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cerr << "Index succesfully built in: "<< (t2-t1) << " seconds. " << endl;
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
   delete(index);
   delete(parameters);
   exit(0);

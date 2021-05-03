@@ -1,7 +1,22 @@
 /*
- Daniel Valenzuela
- Simple buffer that offer an interface to go character by character from an array or from a file.
- */
+	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
+
+	 This file is part of CHIC aligner.
+
+	 CHIC aligner is free software: you can redistribute it and/or modify
+	 it under the terms of the GNU General Public License as published by
+	 the Free Software Foundation, either version 3 of the License, or
+	 (at your option) any later version.
+
+	 CHIC aligner is distributed in the hope that it will be useful,
+	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 GNU General Public License for more details.
+
+	 You should have received a copy of the GNU General Public License
+	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef MYBUFFERMIX_H_ 
 #define MYBUFFERMIX_H_ 
 
@@ -10,16 +25,12 @@
 class MyBufferMix : public MyBuffer{
   public:
     MyBufferMix(char * filename) {
-        fprintf(stdout, " MIX");
-
-        fs.open(filename);
+      fs.open(filename);
       ASSERT(fs.good());
       seq = NULL;
     }
     MyBufferMix(uchar * _seq, size_t _len) {
-        fprintf(stdout, " MIX");
-
-        seq = _seq;
+      seq = _seq;
       len = _len;
       i = 0;
     }
@@ -39,7 +50,7 @@ class MyBufferMix : public MyBuffer{
         return ans;
       } else {
         if(!fs.good()) {
-          cout << "A PROBLEM OCCURRED WITH FS!! " << endl;
+          cerr << "A PROBLEM OCCURRED WITH FS!! " << endl;
           exit(EXIT_FAILURE);
         }
         return  fs.get();

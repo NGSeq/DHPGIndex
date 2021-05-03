@@ -1,7 +1,27 @@
+/*
+	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
+
+	 This file is part of CHIC aligner.
+
+	 CHIC aligner is free software: you can redistribute it and/or modify
+	 it under the terms of the GNU General Public License as published by
+	 the Free Software Foundation, either version 3 of the License, or
+	 (at your option) any later version.
+
+	 CHIC aligner is distributed in the hope that it will be useful,
+	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 GNU General Public License for more details.
+
+	 You should have received a copy of the GNU General Public License
+	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef RANGEREPORTING_H
 #define RANGEREPORTING_H
 
 #include "utils.h"
+#include <string>
 #include <vector>
 #include <sdsl/rmq_support.hpp>
 #include <sdsl/util.hpp>
@@ -58,7 +78,8 @@ class RangeReporting {
     vector<tuple<uint64_t, uint64_t, uint64_t> > phrases_to_grid(vector<pair<uint64_t, uint64_t> > * lz_phrases);
     // it stores in occ[nOcc] all secondary occurrences from the segment T[x..y]
 
-
+    void EncodeRMQonY(vector<tuple<uint64_t, uint64_t, uint64_t> > grid_phrases);
+											
     void MergePhrases(vector<pair<uint64_t, uint64_t> > * _lz_phrases, uint threshold);
     void EncodeX(vector<tuple<uint64_t, uint64_t, uint64_t> > grid_phrases);
     void EncodePtr(vector<tuple<uint64_t, uint64_t, uint64_t> > grid_phrases);
@@ -90,14 +111,14 @@ class RangeReporting {
     uint size2SRR;	// total size of this Two Sided RR data structure
 
 
-    char index_prefix[200];
+    std::string index_prefix;
     // Own files:
-    char rmq_filename[200];
-    char x_filename[200];
-    char ptr_filename[200];
-    char limits_filename[200];
-    char sparser_sample_X_filename[200];
-    char is_literal_name[200];
+    std::string rmq_filename;
+    std::string x_filename;
+    std::string ptr_filename;
+    std::string limits_filename;
+    std::string sparser_sample_X_filename;
+    std::string is_literal_name;
 };
 
 #endif /* NEWTWOSIDEDRR_H_ */

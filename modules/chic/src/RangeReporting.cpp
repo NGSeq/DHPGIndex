@@ -18,26 +18,14 @@ RangeReporting::RangeReporting(vector<pair<uint64_t, uint64_t> > * lz_phrases,
   size2SRR = 0;
   verbose = _verbose;
   MergePhrases(lz_phrases, 2*context_len);
-  
+
   vector<tuple<uint64_t, uint64_t, uint64_t> > grid_phrases;
   grid_phrases = phrases_to_grid(lz_phrases);
 
   this->n_phrases_grid = grid_phrases.size();
   this->sparse_sample_ratio = SPARSE_DENS;
 
-  // TODO: encapsulate in EncodeRMQonY
-  int_vector<> tmp_Y(n_phrases_grid);
-  for (size_t i = 0; i < n_phrases_grid; i++) {
-    uint64_t x_val = std::get<0>(grid_phrases.at(i));
-    uint64_t y_val = std::get<1>(grid_phrases.at(i));
-    tmp_Y[i] = x_val + y_val - (uint64_t)1;;
-  }
-
-  // false => range MAX queries.
-  new_rmq = rmq_succinct_sct<false>(&tmp_Y);
-  clear(tmp_Y);
-  size2SRR += size_in_bytes(new_rmq);
-
+	EncodeRMQonY(grid_phrases);
   EncodeX(grid_phrases);
   EncodePtr(grid_phrases);
   EncodeLimits(lz_phrases);
@@ -45,22 +33,22 @@ RangeReporting::RangeReporting(vector<pair<uint64_t, uint64_t> > * lz_phrases,
 }
 
 // TODO(CodeQual)
-// Maybe move to LZINDEX, altohether with is_literal vector,
+// Maybe move to LZINDEX, altogether with is_literal vector,
 // and pass this vector as parameter for construction. Anyway, this code doesnt quite fit here.
 void RangeReporting::MergePhrases(vector<pair<uint64_t, uint64_t> > *lz_phrases,
                                   uint threshold) {
-  // need to be checked before merging, other wise, the answer will always be true.
+  // need to be checked before merging, otherwise, the answer will always be true.
   bool first_is_literal = false;
   size_t first_len = lz_phrases->at(0).second;
   if (first_len != 0) {
     first_is_literal = true;
   }
   if (verbose >= 3) {
-    cout << "Phrases:" << endl;
+    cerr << "Phrases:" << endl;
     for (size_t i = 0; i < lz_phrases->size(); i++) {
-      cout << "(" << lz_phrases->at(i).first << "," << lz_phrases->at(i).second << ") ";
+      cerr << "(" << lz_phrases->at(i).first << "," << lz_phrases->at(i).second << ") ";
     }
-    cout << endl;
+    cerr << endl;
   }
   is_literal.resize(lz_phrases->size());
   size_t j = 0;
@@ -97,30 +85,44 @@ void RangeReporting::MergePhrases(vector<pair<uint64_t, uint64_t> > *lz_phrases,
     // This enable us to accpet RLZ - Prefix parse.
     // If that was used, the first phrase is a long one (size of ref).
     is_literal[0] = true;
-    cout << "First phrase is long, assuming RLZ." << endl;
-    cout << "Length of first phrase: " << first_len << endl;
+    cerr << "First phrase is long, assuming RLZ." << endl;
+    cerr << "Length of first phrase: " << first_len << endl;
   }
   lz_phrases->resize(j);
 
   size2SRR += size_in_bytes(is_literal);
 
   if (verbose >= 3) {
-    cout << "Merged phrases:" << endl;
+    cerr << "Merged phrases:" << endl;
     for (size_t i = 0; i < lz_phrases->size(); i++) {
       if (!is_literal[i]) {
-        cout << "(" << lz_phrases->at(i).first << "," << lz_phrases->at(i).second << ") ";
+        cerr << "(" << lz_phrases->at(i).first << "," << lz_phrases->at(i).second << ") ";
       } else {
-        cout << "(str," << lz_phrases->at(i).second << ") ";
+        cerr << "(str," << lz_phrases->at(i).second << ") ";
       }
     }
-    cout << endl;
+    cerr << endl;
 
-    cout << "Is Literal Flag:" << endl;
+    cerr << "Is Literal Flag:" << endl;
     for (size_t i = 0; i < lz_phrases->size(); i++) {
-      cout << is_literal[i] << " ";
+      cerr << is_literal[i] << " ";
     }
-    cout << endl;
+    cerr << endl;
   }
+}
+
+void RangeReporting::EncodeRMQonY(vector<tuple<uint64_t, uint64_t, uint64_t> > grid_phrases) {
+  int_vector<> tmp_Y(n_phrases_grid);
+  for (size_t i = 0; i < n_phrases_grid; i++) {
+    uint64_t x_val = std::get<0>(grid_phrases.at(i));
+    uint64_t y_val = std::get<1>(grid_phrases.at(i));
+    tmp_Y[i] = x_val + y_val - (uint64_t)1;;
+  }
+
+  // false => range MAX queries.
+  new_rmq = rmq_succinct_sct<false>(&tmp_Y);
+  clear(tmp_Y);
+  size2SRR += size_in_bytes(new_rmq);
 }
 
 void RangeReporting::EncodeX(vector<tuple<uint64_t, uint64_t, uint64_t> > grid_phrases) {
@@ -173,11 +175,11 @@ void RangeReporting::EncodeLimits(vector<pair<uint64_t, uint64_t>> * lz_phrases)
   encoded_limits = enc_vector<elias_delta, REGULAR_DENS>(limits_gog_tmp);
   size2SRR += size_in_bytes(encoded_limits);
   if (verbose >= 3) {
-    cout << "Limits: " << endl;
+    cerr << "Limits: " << endl;
     for (size_t i = 0; i < encoded_limits.size(); i++) {
-      cout << encoded_limits[i] << " ";
+      cerr << encoded_limits[i] << " ";
     }
-    cout << endl;
+    cerr << endl;
   }
 }
 
@@ -194,12 +196,12 @@ vector<tuple<uint64_t, uint64_t, uint64_t> > RangeReporting::phrases_to_grid(vec
   }
   std::sort(begin(ans), end(ans));
   if (verbose >= 3) {
-    cout << "tmp grid phrases:" << endl;
+    cerr << "tmp grid phrases:" << endl;
     for (size_t i = 0; i < ans.size(); i++) {
       uint64_t a = std::get<0>(ans[i]);
       uint64_t b = std::get<1>(ans[i]);
       uint64_t c = std::get<2>(ans[i]);
-      cout << "( " << a << ", " << b << ", " << c << " )" << endl;
+      cerr << "( " << a << ", " << b << ", " << c << " )" << endl;
     }
   }
   return ans;
@@ -243,12 +245,12 @@ bool RangeReporting::IsLiteral(uint i) const {
 
 
 void RangeReporting::DetailedSpaceUssage() const {
-  cout << " RMQ             :" << size_in_bytes(new_rmq) << endl;
-  cout << " Sparse sample X :" << sparser_sample_X.size()*sizeof(uint64_t) << endl;
-  cout << " X               :" << size_in_bytes(new_X) << endl;
-  cout << " Ptr             :" << size_in_bytes(new_ptr) << endl;
-  cout << " Limits          :" << size_in_bytes(encoded_limits) << endl;
-  cout << " IsLiteralFlags :" << size_in_bytes(is_literal) << endl;
+  cerr << " RMQ             :" << size_in_bytes(new_rmq) << endl;
+  cerr << " Sparse sample X :" << sparser_sample_X.size()*sizeof(uint64_t) << endl;
+  cerr << " X               :" << size_in_bytes(new_X) << endl;
+  cerr << " Ptr             :" << size_in_bytes(new_ptr) << endl;
+  cerr << " Limits          :" << size_in_bytes(encoded_limits) << endl;
+  cerr << " IsLiteralFlags :" << size_in_bytes(is_literal) << endl;
 }
 
 
@@ -260,8 +262,8 @@ void RangeReporting::DetailedSpaceUssage() const {
 
 // it stores in occ[nOcc] all secondary occurrences from the segment T[x..y]
 void RangeReporting::queryRR(uint64_t x, uint64_t y, vector<uint64_t> * occs) const {
-  if (verbose >= 4) {
-    cout << "Starting RR from x = " << x << ", y = " << y << endl;
+  if (verbose >= 3) {
+    cerr << "Starting RR from x = " << x << ", y = " << y << endl;
   }
   uint64_t pred = searchPred(x);
   uint64_t pred_X = GetX(pred);
@@ -273,8 +275,8 @@ void RangeReporting::queryRR(uint64_t x, uint64_t y, vector<uint64_t> * occs) co
       // predecessor should find the first phrase (as there is no "null" answer), but that
       // first phrase is not really a predecesor.
       // TODO(TEST): make a test that triggeer this case.
-      cout << "For x:" << x << " I'm discarding recursive report" << endl;
-      cout << "Because the X val of predecessor is: " << pred_X << " > " << x << endl;
+      cerr << "For x:" << x << " I'm discarding recursive report" << endl;
+      cerr << "Because the X val of predecessor is: " << pred_X << " > " << x << endl;
     }
     return;
   }
@@ -335,8 +337,8 @@ void RangeReporting::recursiveReport(uint64_t y,
                                      uint64_t l,
                                      uint64_t r,
                                      vector<uint64_t> * occs) const {
-  if (verbose >= 4) {
-    cout << "Recursive report: y = " << y << ", l = " << l << ", r = " << r << endl;
+  if (verbose >= 3) {
+    cerr << "Recursive report: y = " << y << ", l = " << l << ", r = " << r << endl;
   }
   if (l <=r) {
     uint64_t pos = new_rmq(l, r);
@@ -348,14 +350,7 @@ void RangeReporting::recursiveReport(uint64_t y,
     if (Yp > y) {
       occs->push_back(pos);
       if (verbose >= 3) {
-        cout << "Pos = " << pos << " !" << endl;
-        cout << "Occurrence: " << occs << "found ! " << endl;
-        cout << "size of occs: " << occs->size() << endl;
-          for (unsigned i=0; i<occs->size(); i++)
-              std::cout << ' ' << occs->at(i);
-          std::cout << '\n';
-        cout << " x = " << x << " y = " << y << ", l = " << l << ", r = " << r << endl;
-
+        cerr << "Pos = " << pos << "found ! " << endl;
       }
       if (pos)
         recursiveReport(y, l, pos-1, occs);
@@ -377,45 +372,50 @@ void RangeReporting::ComputeSize() {
 }
 
 void RangeReporting::SetFileNames(char * _prefix) {
-  sprintf(index_prefix, "%s", _prefix);
+  index_prefix.assign(_prefix);
   // ASSERT prefix != "null" ?
   // RR
+  rmq_filename = index_prefix + ".rmq";
+  x_filename = index_prefix + ".x";
+  ptr_filename = index_prefix + ".ptr";
+  limits_filename = index_prefix + ".limits";
+  sparser_sample_X_filename = index_prefix + ".sparseX";
+  is_literal_name = index_prefix + ".is_literal";
+  /*
   sprintf(rmq_filename, "%s.rmq", index_prefix);
   sprintf(x_filename, "%s.x", index_prefix);
   sprintf(ptr_filename, "%s.ptr", index_prefix);
   sprintf(limits_filename, "%s.limits", index_prefix);
   sprintf(sparser_sample_X_filename, "%s.sparseX", index_prefix);
   sprintf(is_literal_name, "%s.is_literal", index_prefix);
+  */
 }
 
 void RangeReporting::Save() const {
-  store_to_file(new_rmq, rmq_filename);
-  store_to_file(new_X, x_filename);
-  store_to_file(new_ptr, ptr_filename);
-  store_to_file(encoded_limits, limits_filename);
-  store_to_file(sparser_sample_X, sparser_sample_X_filename);
-  store_to_file(is_literal, is_literal_name);
+  store_to_file(new_rmq, rmq_filename.c_str());
+  store_to_file(new_X, x_filename.c_str());
+  store_to_file(new_ptr, ptr_filename.c_str());
+  store_to_file(encoded_limits, limits_filename.c_str());
+  store_to_file(sparser_sample_X, sparser_sample_X_filename.c_str());
+  store_to_file(is_literal, is_literal_name.c_str());
 }
 
 void RangeReporting::Load(char * _prefix, int _verbose) {
   this->verbose = _verbose;
   SetFileNames(_prefix);
 
-  load_from_file(new_rmq, rmq_filename);
-  load_from_file(new_X, x_filename);
-  load_from_file(new_ptr, ptr_filename);
-  load_from_file(encoded_limits, limits_filename);
-  load_from_file(sparser_sample_X, sparser_sample_X_filename);
-  load_from_file(is_literal, is_literal_name);
+  load_from_file(new_rmq, rmq_filename.c_str());
+  load_from_file(new_X, x_filename.c_str());
+  load_from_file(new_ptr, ptr_filename.c_str());
+  load_from_file(encoded_limits, limits_filename.c_str());
+  load_from_file(sparser_sample_X, sparser_sample_X_filename.c_str());
+  load_from_file(is_literal, is_literal_name.c_str());
 
   n_phrases_grid = new_X.size();
   sparse_sample_ratio = SPARSE_DENS;
   size2SRR = 0;
   ComputeSize();
 }
-
-
-
 
 RangeReporting::~RangeReporting() {
 }

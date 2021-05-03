@@ -1,36 +1,56 @@
-// Copyright Daniel Valenzuela
+/*
+	 Copyright 2017, Daniel Valenzuela <dvalenzu@cs.helsinki.fi>
+
+	 This file is part of CHIC aligner.
+
+	 CHIC aligner is free software: you can redistribute it and/or modify
+	 it under the terms of the GNU General Public License as published by
+	 the Free Software Foundation, either version 3 of the License, or
+	 (at your option) any later version.
+
+	 CHIC aligner is distributed in the hope that it will be useful,
+	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 GNU General Public License for more details.
+
+	 You should have received a copy of the GNU General Public License
+	 along with CHIC aligner.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "./HybridLZIndex.h"
+#include <omp.h>
 #include <sdsl/util.hpp>
 #include <sdsl/vectors.hpp>
 #include <string>
 #include <utility>
 #include <algorithm>
 #include <vector>
+
 #include "./utils.h"
+#include "./SamReader.h"
 #include "./LempelZivParser.h"
 #include "../ext/LZ/LZscan/algorithm/lzscan.h"
-#include "./jni/hdfs.h"
-
 
 // INDEX CONSTRUCTION:
 void HybridLZIndex::ValidateParams(BuildParameters * parameters) {
-    if (Utils::IsBioKernel(parameters->kernel_type)) {
-        if (!(parameters->lz_method == LZMethod::IN_MEMORY || parameters->lz_method == LZMethod::RLZ)){
-            if (!(parameters->lz_method == LZMethod::RLZ)){
-                cout << "Currently, only In memory and RLZ are supported for fasta files" << endl;
-                cout << "Abortning" << endl;
-                exit(EXIT_FAILURE);
-            }
-        }}
+  if (Utils::IsBioKernel(parameters->kernel_type)) {
+    if (!(parameters->lz_method == LZMethod::IN_MEMORY || 
+          parameters->lz_method == LZMethod::RLZ || 
+          parameters->lz_method == LZMethod::RELZ ||
+          parameters->lz_method == LZMethod::INPUT_VBYTE ||
+          parameters->lz_method == LZMethod::INPUT_PLAIN)) {
+      cerr << "Currently, only IM, RLZ, and INPUT  are supported for fasta files" << endl;
+      cerr << "Abortning" << endl;
+      exit(EXIT_FAILURE);
+    }
+  }
 }
 
 HybridLZIndex::HybridLZIndex() {
-    fprintf(stdout, " HLZ");
   this->index_size_in_bytes = 0;
 }
 
 HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
-    fprintf(stdout, " HLZ 0");
   this->verbose = parameters->verbose;
   //ValidateParams(parameters);
   this->lz_method = parameters->lz_method;
@@ -46,27 +66,20 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
     this->tmp_seq = _seq;
     this->text_len = _len;
     this->text_filename = parameters->input_filename;
-    //if (_max_memory_MB == 0) _max_memory_MB = 100;
   } else {*/
-    fprintf(stdout, " HLZ 1");
     this->book_keeper = new BookKeeper(parameters->input_filename,
                                        parameters->kernel_type,
                                        verbose);
-    fprintf(stdout, " HLZ 2");
-    //char * new_input_name = book_keeper->GetNewFileName();
-    //this->text_filename = new_input_name;
     this->text_filename = parameters->input_filename;
     this->text_len = book_keeper->GetTotalLength();
-    
-    
+
+
     this->tmp_seq = NULL;
-    //ASSERT(parameters->max_memory_MB > 0);
+    // ASSERT(parameters->max_memory_MB > 0);
   //}
-    fprintf(stdout, "LZ file %s",parameters->input_lz_filename);
-    fprintf(stdout, "Indexing only = %d", parameters->indexingonly);
-
   this->input_lz_filename = parameters->input_lz_filename;
-
+    cout << "parameters->input_lz_filename   : " << parameters->input_lz_filename << endl;
+    cout << "Indexing only   : " << parameters->indexingonly << endl;
   index_size_in_bytes = 0;
 
   this->kernel_type = parameters->kernel_type;
@@ -81,22 +94,17 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
 
   this->index_prefix = parameters->output_filename;
   SetFileNames();
-    this->hdfs_path = parameters->hdfs_path;
-  if(parameters->kernelizeonly==1){
-          InitKernelizeonly();
-  }else{
+
       if(parameters->indexingonly==1)
           Indexing();
       else{
           Build();
       }
-  }
-
 
 }
 
 void HybridLZIndex::Build() {
-    try {
+
 
     if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2 || kernel_type == KernelType::BLAST ) {
     special_separator = (uchar)'N';
@@ -114,19 +122,17 @@ void HybridLZIndex::Build() {
   tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
   tsrr->SetFileNames(index_prefix);
   if (verbose >= 2)
-    cout << "Previous merge: " << n_phrases << " phrases." << endl;
+    cerr << "Previous merge: " << n_phrases << " phrases." << endl;
   n_phrases = lz_phrases.size();
   if (verbose >= 2)
-    cout << "After merge: " << n_phrases << " phrases." << endl;
+    cerr << "After merge: " << n_phrases << " phrases." << endl;
   index_size_in_bytes += tsrr->GetSizeBytes();
   Kernelize();
   ComputeSize();
   if (verbose >= 2) {
     DetailedSpaceUssage();
   }
-    }catch(const char *e){
-        cout << "Exception: " << e << " "<< endl;
-    }
+
 }
 
 void HybridLZIndex::Indexing() {
@@ -139,44 +145,13 @@ void HybridLZIndex::Indexing() {
             ChooseSpecialSeparator(text_filename);
         }
     }
-
-    fprintf(stdout," ndexing only. Reading LZ parse..");
+    cout << "Indexing only. Reading LZ parse.." << endl;
     vector<pair<uint64_t, uint64_t> > lz_phrases;
     //LempelZivParser::GetLZPhrases(&lz_phrases, this);
-    FILE * lz_infile  = Utils::OpenReadOrDie(GetInputLZFilename());
-    LempelZivParser::LoadLZParse(lz_infile, &lz_phrases);
+    FILE * lz_infile  = Utils::OpenReadOrDie(this->input_lz_filename);
+    LempelZivParser::LoadLZParsePlain(lz_infile, &lz_phrases);
     n_phrases = lz_phrases.size();
-    tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
-    tsrr->SetFileNames(index_prefix);
-
-    if (verbose >= 2)
-        fprintf(stdout," PHRASES Previous merge:: %d \\n", n_phrases );
-    n_phrases = lz_phrases.size();
-    if (verbose >= 2)
-        fprintf(stdout," After merge: %d \\n", n_phrases );
-
-    index_size_in_bytes += tsrr->GetSizeBytes();
-    IndexKernel();
-    ComputeSize();
-    if (verbose >= 2) {
-        DetailedSpaceUssage();
-    }
-}
-
-void HybridLZIndex::InitKernelizeonly(){
-    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2|| kernel_type == KernelType::BLAST) {
-        special_separator = (uchar)'N';
-    } else {
-        if (lz_method == LZMethod::IN_MEMORY) {
-            ChooseSpecialSeparator(tmp_seq);
-        } else {
-            ChooseSpecialSeparator(text_filename);
-        }
-    }
-
-    vector<pair<uint64_t, uint64_t> > lz_phrases;
-    LempelZivParser::GetLZPhrases(&lz_phrases, this);
-    n_phrases = lz_phrases.size();
+    cout << "Indexing only. LZ Range reporting.." << endl;
     tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
     tsrr->SetFileNames(index_prefix);
     if (verbose >= 2)
@@ -185,73 +160,74 @@ void HybridLZIndex::InitKernelizeonly(){
     if (verbose >= 2)
         cout << "After merge: " << n_phrases << " phrases." << endl;
     index_size_in_bytes += tsrr->GetSizeBytes();
-    Kernelizeonly();
+    IndexKernel();
     ComputeSize();
     if (verbose >= 2) {
         DetailedSpaceUssage();
     }
 }
 
-void HybridLZIndex::Kernelizeonly() {
-    ComputeKernelTextLen();
-    if (verbose) {
-        cout << "+++++++++++++++++Kernelizeonly++++++++++++++++++++++++++++" << endl;
-        cout << "Original length n    : " << text_len << endl;
-        cout << "Kernel text length n : " << kernel_text_len << endl;
-        cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
-    }
 
-    uint64_t *tmp_limits_kernel;
-    uchar *kernel_text;
+void HybridLZIndex::Kernelize() {
+  ComputeKernelTextLen();
+  if (verbose) {
+    cerr << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+    cerr << "Original length n    : " << text_len << endl;
+    cerr << "Kernel text length n : " << kernel_text_len << endl;
+    cerr << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  }
 
-    long t1 = Utils::wclock();
+  uint64_t *tmp_limits_kernel;
+  uchar *kernel_text;
 
- MyBuffer * my_buffer;
+  MyBuffer * my_buffer;
   if (lz_method == LZMethod::IN_MEMORY) {
     my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
   } else {
-    //if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
     if (Utils::IsBioKernel(kernel_type)) {
-            if(this->hdfs_path != NULL)
-                my_buffer = new MyBufferHDFS(this->hdfs_path);
-            else my_buffer = new MyBufferFastaFile(text_filename);
+      my_buffer = new MyBufferFastaFile(text_filename);
     } else {
       my_buffer = new MyBufferPlainFile(text_filename);
     }
   }
+  MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
+  delete(my_buffer);
 
-    MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
-    long t2 = Utils::wclock();
-    cout << "MakeKernelString from HDFS: "<< (t2-t1) << " seconds. " << endl;
+	// kenrel_text is deleted by KernelManager
+  if (kernel_type == KernelType::FMI) {
+    kernel_manager = new KernelManagerFMI(kernel_text,
+                                          kernel_text_len,
+                                          kernel_manager_prefix,
+                                          verbose);
+  } else if (kernel_type == KernelType::BWA) {
+    kernel_manager = new KernelManagerBWA(kernel_text,
+                                          kernel_text_len,
+                                          kernel_manager_prefix,
+                                          verbose);
+  } else if (kernel_type == KernelType::BOWTIE2) {
+    kernel_manager = new KernelManagerBowTie2(kernel_text,
+                                              kernel_text_len,
+                                              kernel_manager_prefix,
+                                              n_threads,
+                                              max_memory_MB,
+                                              verbose);
+  } else if (kernel_type == KernelType::BLAST) {
+      kernel_manager = new KernelManagerBLAST(kernel_text,
+                                              kernel_text_len,
+                                              kernel_manager_prefix,
+                                              n_threads,
+                                              max_memory_MB,
+                                              verbose);
+  } else {
+    cerr << "Unknown kernel type given" << endl;
+    exit(EXIT_FAILURE);
+  }
 
-    delete(my_buffer);
+  EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
+  delete [] tmp_limits_kernel;
 
-    long k1 = Utils::wclock();
-
-    this->WriteKernelTextFile(kernel_text, kernel_text_len);
-
-    long k2 = Utils::wclock();
-    cout << "Kernelized: "<< (t2-t1) << " seconds. " << endl;
-
-    //delete [] kernel_text;
-
-    //EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
-    //store_to_file(limits_kernel, limits_kernel_filename);
-    //store_to_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
-
-    //delete [] tmp_limits_kernel;
-
-    //index_size_in_bytes += kernel_manager->GetSizeBytes();
-    // ASSERT(kernel_text_len == kernel_manager->GetLength());
-}
-
-void HybridLZIndex::WriteKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len) {
-    FILE * fp = Utils::OpenWriteOrDie(kernel_manager_prefix);
-    if (_kernel_text_len != fwrite(_kernel_text, 1, _kernel_text_len, fp)) {
-        cout << "Error writing the kernel to a file" << endl;
-        exit(1);
-    }
-    fclose(fp);
+  index_size_in_bytes += kernel_manager->GetSizeBytes();
+  // ASSERT(kernel_text_len == kernel_manager->GetLength());
 }
 
 void HybridLZIndex::IndexKernel() {
@@ -281,8 +257,8 @@ void HybridLZIndex::IndexKernel() {
                                                   verbose);
     } else if (kernel_type == KernelType::BLAST) {
         kernel_manager = new KernelManagerBLAST(kernel_manager_prefix,
-                                                  n_threads,
-                                                  verbose);
+                                                n_threads,
+                                                verbose);
     } else {
         cerr << "Unknown kernel type given" << endl;
         exit(EXIT_FAILURE);
@@ -301,114 +277,28 @@ void HybridLZIndex::IndexKernel() {
     // ASSERT(kernel_text_len == kernel_manager->GetLength());
 }
 
-void HybridLZIndex::Kernelize() {
-  ComputeKernelTextLen();
-
-    fprintf(stdout,"+++++++++++++++++++++++++++++++++++++++++++++");
-    fprintf(stdout, "Original length n    :  %lu", text_len);
-    fprintf(stdout, "Kernel text length n : %lu", kernel_text_len);
-    cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
-
-    try {
-
-
-        fprintf(stdout, " HERE 1");
-    uint64_t *tmp_limits_kernel;
-  uchar *kernel_text;
-
-  long t1 = Utils::wclock();
-  MyBuffer * my_buffer;
-  if (lz_method == LZMethod::IN_MEMORY) {
-    my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
-  } else {
-    //if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2) {
-    if (Utils::IsBioKernel(kernel_type)) {
-            if(this->hdfs_path != NULL)
-                my_buffer = new MyBufferHDFS(this->hdfs_path);
-            else my_buffer = new MyBufferFastaFile(text_filename);
-    } else {
-      my_buffer = new MyBufferPlainFile(text_filename);
-    }
-  }
-
-        fprintf(stdout, " HERE 2");
-  MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
-  long t2 = Utils::wclock();
-  cout << "MakeKernelString: "<< (t2-t1) << " seconds. " << endl;
-
-  delete(my_buffer);
-
-    long k1 = Utils::wclock();
-  if (kernel_type == KernelType::FMI) {
-    kernel_manager = new KernelManagerFMI(kernel_text,
-                                          kernel_text_len,
-                                          kernel_manager_prefix,
-                                          verbose);
-  } else if (kernel_type == KernelType::BWA) {
-    kernel_manager = new KernelManagerBWA(kernel_text,
-                                          kernel_text_len,
-                                          kernel_manager_prefix,
-                                          verbose);
-  } else if (kernel_type == KernelType::BOWTIE2) {
-    kernel_manager = new KernelManagerBowTie2(kernel_text,
-                                              kernel_text_len,
-                                              n_threads,
-                                              kernel_manager_prefix,
-                                              verbose);
-  } else if (kernel_type == KernelType::BLAST) {
-      kernel_manager = new KernelManagerBLAST(kernel_text,
-                                                kernel_text_len,
-                                                n_threads,
-                                                kernel_manager_prefix,
-                                                verbose);
-  } else {
-    cerr << "Unknown kernel type given" << endl;
-    exit(EXIT_FAILURE);
-  }
-  long k2 = Utils::wclock();
-  cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
-
-   // delete [] kernel_text;
-
-  EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
-  delete [] tmp_limits_kernel;
-
-  index_size_in_bytes += kernel_manager->GetSizeBytes();
-  // ASSERT(kernel_text_len == kernel_manager->GetLength());
-    }catch(const char *e){
-        cout << "Exception: " << e << " "<< endl;
-    }
-}
-
 // Assumes that the resulting kernel string fits in main memory.
 // That is OK, as we will need to index it, so this is a hard limit for now.
-//TODO: Do this in partitions and merge kerneltext in the end
 void HybridLZIndex::MakeKernelString(MyBuffer * is,
                                      uchar ** kernel_ans,
                                      uint64_t ** tmp_limits_kernel_ans) {
   // Relies on GetLimit to navigate through the phrases.
-  //cout << "Allocate memory for kernel text of len:: " << kernel_text_len << endl;
   uchar *kernel_text;   // Filtered text
-
-  fprintf(stdout, "Allocate memory for kernel text of len ");
-    fprintf(stdout, "%lu", kernel_text_len);
-
   kernel_text = new uchar[kernel_text_len];
   uint64_t *tmp_limits_kernel = new uint64_t[n_phrases+1];
   uint64_t left, right, posFil;
   left = posFil = 0;
   for (size_t i = 0; i < n_phrases; i++) {
     tmp_limits_kernel[i] = posFil;
-    //fprintf(stdout, " limit kernel... ");
     if (verbose >= 3) {
-      cout << "limit kernel: " << posFil << endl;
+      cerr << "limit kernel: " << posFil << endl;
     }
     if (i+1 < n_phrases) {
       right = GetLimit(i+1);
       if (right-left < 2*context_len+2 || tsrr->IsLiteral(i)) {
         is->SetPos(left);
         for (size_t j =left; j < right; j++, posFil++) {
-          kernel_text[posFil] = is->GetChar();
+          kernel_text[posFil] = is->GetChar();;
         }
       } else {
         // copy M symbol + '$' + M symbols...
@@ -460,11 +350,11 @@ void HybridLZIndex::MakeKernelString(MyBuffer * is,
   *kernel_ans = kernel_text;
   if (verbose >= 3 && kernel_text_len <= 1000) {
     string tmp_kernel((const char *)kernel_text, kernel_text_len);
-    cout << "*******";
-    cout << tmp_kernel;
-    cout << "*******";
+    cerr << "*******";
+    cerr << tmp_kernel;
+    cerr << "*******";
 
-    cout << "*******" << endl;
+    cerr << "*******" << endl;
     for (size_t i = 0; i < kernel_text_len; i++) {
       if (kernel_text[i] != special_separator) {
         printf("L");
@@ -472,8 +362,7 @@ void HybridLZIndex::MakeKernelString(MyBuffer * is,
         printf(" S ");
       }
     }
-    cout << "*******" << endl;
-
+    cerr << "*******" << endl;
   }
 }
 
@@ -501,11 +390,7 @@ void HybridLZIndex::EncodeKernelLimitsAndSuccessor(uint64_t * tmp_limits_kernel)
 }
 
 void HybridLZIndex::ComputeKernelTextLen() {
-    try {
-
-
-   fprintf(stdout,"PHRASES: %u",n_phrases);
-    uint64_t l, r;
+  uint64_t l, r;
   kernel_text_len = l = 0;
   for (size_t i = 0; i< n_phrases; i++) {
     if (i+1 < n_phrases) {
@@ -513,7 +398,7 @@ void HybridLZIndex::ComputeKernelTextLen() {
       if (r-l < 2*context_len+2 || tsrr->IsLiteral(i))
         kernel_text_len += r-l;
       else
-        kernel_text_len += 2*context_len + 1 + max_insertions ;  // to copy  M + '$' +k*'$' + M symbols = 2M+1
+        kernel_text_len += 2*context_len + 1 + max_insertions;  // to copy  M + '$' +k*'$' + M symbols = 2M+1
     } else {
       r = text_len;
       if (r-l <= context_len || tsrr->IsLiteral(i))
@@ -522,27 +407,23 @@ void HybridLZIndex::ComputeKernelTextLen() {
         kernel_text_len += context_len + 2 + max_insertions;   // to copy current symbol + M + '$'= M+2
     }
     l =r;
-
   }
-  fprintf(stdout,"%lu ",kernel_text_len);
-    }catch(const char *e){
-        fprintf(stdout,"Exception: %s",e);
-    }
 }
 
 void HybridLZIndex::SetFileNames() {
   sprintf(sparse_sample_limits_kernel_filename, "%s.sparse_sample_limits_kernel", index_prefix);
   sprintf(limits_kernel_filename, "%s.limits_kernel", index_prefix);
   sprintf(variables_filename, "%s.variables", index_prefix);
+  /*
   sprintf(kernel_manager_prefix,
           "%s.P%d_GC%d_kernel_text",
           index_prefix,
           sparse_sample_ratio,
           REGULAR_DENS);
+          */
+  sprintf(kernel_manager_prefix, "%s.kernel_text", index_prefix);
 }
 
-
-//TODO: do this from HDFS
 void HybridLZIndex::ChooseSpecialSeparator(char * filename) {
   FILE * fp = Utils::OpenReadOrDie(filename);
 
@@ -577,7 +458,7 @@ void HybridLZIndex::ChooseSpecialSeparator(char * filename) {
     }
     curr_pos += chunk_size;
     if (verbose >= 2) {
-      cout << "Current pos in whole buffer: " << i << endl;
+      cerr << "Current pos in whole buffer: " << i << endl;
     }
   }
   delete[] buffer;
@@ -612,12 +493,12 @@ void HybridLZIndex::ChooseSpecialSeparator(uchar *seq) {
 void HybridLZIndex::SetSpecialSeparator(uint64_t * alpha_test_tmp) {
   /*
   if (verbose >= 3) {
-    cout << "--------------------" << endl;
-    cout << "Alphabet: " << endl;
+    cerr << "--------------------" << endl;
+    cerr << "Alphabet: " << endl;
     for (size_t i = 0; i < sigma; i++)
-      cout << alpha_test_tmp[i] << " ";
-    cout << "--------------------" << endl;
-    cout << endl;
+      cerr << alpha_test_tmp[i] << " ";
+    cerr << "--------------------" << endl;
+    cerr << endl;
   }
 */
   bool found;
@@ -658,8 +539,8 @@ void HybridLZIndex::SetSpecialSeparator(uint64_t * alpha_test_tmp) {
 
   if (found) {
     if (verbose) {
-      cout << "Separator symbol: code = " << (uint)special_separator;
-      cout << "                symbol = " << special_separator << endl;
+      cerr << "Separator symbol: code = " << (uint)special_separator;
+      cerr << "                symbol = " << special_separator << endl;
     }
   } else {
     cerr << "Couldnt find a separator symbol, aborting!" << endl;
@@ -667,33 +548,7 @@ void HybridLZIndex::SetSpecialSeparator(uint64_t * alpha_test_tmp) {
   }
 }
 
-void HybridLZIndex::WriteToHDFS(uchar * text) {
-
-
-    std::string p("/user/root/index/");
-    string s = kernel_manager_prefix;
-    std::size_t found = s.find_last_of("/\\");
-    p += s.substr(found+1);
-    const char *writePath = p.c_str();
-
-    fs = hdfsConnect("node-1", 8020);
-    hdfsFile hfile = hdfsOpenFile(fs, writePath, O_WRONLY|O_CREAT, 0, 0, 0);
-    cout << writePath << endl;
-    if(!hfile) {
-        fprintf(stderr, "Failed to open %s for writing!\n", writePath);
-    }
-
-    char* buffer = reinterpret_cast<char*>(text);
-    tSize num_written_bytes = hdfsWrite(fs, hfile, (void*)buffer, strlen(buffer)+1);
-
-    if (hdfsFlush(fs, hfile)) {
-        fprintf(stderr, "Failed to 'flush' %s\n", writePath);
-        exit(-1);
-    }
-    hdfsCloseFile(fs, hfile);
-}
-
-/*void HybridLZIndex::SaveToHDFS() const {
+void HybridLZIndex::Save() const {
   FILE * fp = Utils::OpenWriteOrDie(variables_filename);
   if (1 != fwrite(&text_len, sizeof(text_len), 1, fp)) {
     cerr << "Error writing the variables" << endl;
@@ -734,54 +589,8 @@ void HybridLZIndex::WriteToHDFS(uchar * text) {
   book_keeper->Save();
 
   if (verbose) {
-    cout << "Saving is ready" << endl;
+    cerr << "Saving is ready" << endl;
   }
-}
-*/
-
-void HybridLZIndex::Save() const {
-    FILE * fp = Utils::OpenWriteOrDie(variables_filename);
-    if (1 != fwrite(&text_len, sizeof(text_len), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    if (1 != fwrite(&special_separator, sizeof(special_separator), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    if (1 != fwrite(&max_query_len, sizeof(max_query_len), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    if (1 != fwrite(&max_insertions, sizeof(max_insertions), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    if (1 != fwrite(&sparse_sample_ratio, sizeof(sparse_sample_ratio), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    if (1 != fwrite(&kernel_type, sizeof(kernel_type), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    if (1 != fwrite(&kernel_text_len, sizeof(kernel_text_len), 1, fp)) {
-        cerr << "Error writing the variables" << endl;
-        exit(1);
-    }
-    fclose(fp);
-
-    store_to_file(limits_kernel, limits_kernel_filename);
-    store_to_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
-
-    tsrr->Save();
-    kernel_manager->Save();
-    book_keeper->SetFileNames(index_prefix);
-    book_keeper->Save();
-
-    if (verbose) {
-        cout << "Saving is ready" << endl;
-    }
 }
 
 void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
@@ -831,16 +640,6 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
 
   load_from_file(limits_kernel, limits_kernel_filename);
   load_from_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
-    for (size_t i = 0; i < sparse_sample_limits_kernel.size(); i++) {
-        cout << sparse_sample_limits_kernel[i] << endl;
-    }
-
-    for (size_t i = 0; i < limits_kernel.size(); i++) {
-        cout << limits_kernel[i] << endl;
-    }
-    cout << "Limits kernel" <<  limits_kernel_filename << endl;
-    cout << "KernelLimits                      :" << sdsl::size_in_bytes(limits_kernel) << endl;
-    cout << "KernelLimits                      :" << limits_kernel.size() << endl;
 
   tsrr = new RangeReporting();
   tsrr->Load(_prefix, _verbose);
@@ -855,7 +654,7 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
       kernel_manager = new KernelManagerBLAST();
   }
   kernel_manager->Load(kernel_manager_prefix, n_threads, _verbose);
-  //ASSERT(kernel_text_len == kernel_manager->GetLength());
+  // ASSERT(kernel_text_len == kernel_manager->GetLength());
 
   book_keeper = new BookKeeper();
   book_keeper->Load(_prefix, _verbose);
@@ -865,7 +664,7 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
   index_size_in_bytes = 0;
   ComputeSize();
   if (verbose) {
-    cout << "Index succesully loaded. Details:" << endl;
+    cerr << "Index succesully loaded. Details:" << endl;
     DetailedSpaceUssage();
     ASSERT(InspectIndex());
   }
@@ -873,7 +672,7 @@ void HybridLZIndex::Load(char * _prefix, int _n_threads, int _verbose) {
 
 bool HybridLZIndex::InspectIndex() {
   return true;
-  cout << "Give a name to save Limits In Kernek" << endl;
+  cerr << "Give a name to save Limits In Kernek" << endl;
   string output_name;
   std::cin >> output_name;
   std::ofstream tmp_out;
@@ -882,25 +681,25 @@ bool HybridLZIndex::InspectIndex() {
     tmp_out << GetLimitKernel(i) << endl;
   }
   tmp_out.close();
-  cout << "Succesfully saved to " << output_name << endl;
+  cerr << "Succesfully saved to " << output_name << endl;
 
-  cout << "Give a name to save Limits In Text" << endl;
+  cerr << "Give a name to save Limits In Text" << endl;
   std::cin >> output_name;
   tmp_out.open(output_name);
   for (size_t i = 0; i < n_phrases; i++) {
     tmp_out << GetLimit(i) << endl;
   }
   tmp_out.close();
-  cout << "Succesfully saved to " << output_name << endl;
+  cerr << "Succesfully saved to " << output_name << endl;
 
-  cout << "Give a name to save IsLiteral" << endl;
+  cerr << "Give a name to save IsLiteral" << endl;
   std::cin >> output_name;
   tmp_out.open(output_name);
   for (size_t i = 0; i < n_phrases; i++) {
     tmp_out << tsrr->IsLiteral(i) << endl;
   }
   tmp_out.close();
-  cout << "Succesfully saved to " << output_name << endl;
+  cerr << "Succesfully saved to " << output_name << endl;
   return true;
 }
 
@@ -915,21 +714,19 @@ void HybridLZIndex::ComputeSize() {
 }
 
 void HybridLZIndex::DetailedSpaceUssage() const {
-  cout << "--------------------------------------------------" << endl;
-  cout << "Sparse Successor Table   :" << sparse_sample_limits_kernel.size()*sizeof(uint) << endl;
-  cout << "KernelLimits                      :" << sdsl::size_in_bytes(limits_kernel) << endl;
-  cout << "Kernel Index             :" << kernel_manager->GetSizeBytes() << endl;
-  cout << "Range Reporting:" << endl;
+  cerr << "--------------------------------------------------" << endl;
+  cerr << "Sparse Successor Table   :" << sparse_sample_limits_kernel.size()*sizeof(uint) << endl;
+  cerr << "KernelLimits                      :" << sdsl::size_in_bytes(limits_kernel) << endl;
+  cerr << "Kernel Index             :" << kernel_manager->GetSizeBytes() << endl;
+  cerr << "Range Reporting:" << endl;
   tsrr->DetailedSpaceUssage();
-  cout << "--------------------------------------------------" << endl;
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cout << "TOTAL: " << index_size_in_bytes << "bytes, =" << endl;
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  cout << (float)index_size_in_bytes/(float)text_len << "|T|" << endl;
-  cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cerr << "--------------------------------------------------" << endl;
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cerr << "TOTAL: " << index_size_in_bytes << "bytes, =" << endl;
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+  cerr << (float)index_size_in_bytes/(float)text_len << "|T|" << endl;
+  cerr << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
 }
-
-
 
 ////////////////////////////////
 // Queries functions:
@@ -941,168 +738,141 @@ void HybridLZIndex::FindFQ(char * query_filename,
                            SecondaryReportType secondary_report,
                            vector<string> kernel_options,
                            ostream& my_out) const {
-  vector<Occurrence> my_occs;
-  vector<Occurrence> unmapped_occs;
-  FindPrimaryOccsFQ(&my_occs,
-                    &unmapped_occs,
-                    secondary_report,
-                    query_filename,
-                    mates_filename,
-                    single_file_paired,
-                    kernel_options);
-  if (secondary_report == SecondaryReportType::ALL ||
-      secondary_report == SecondaryReportType::LZ) {
-    searchSecondaryOcc(&my_occs);
-  }
+  long double t1, t2;
+  size_t n_partitions = (size_t)n_threads;
+  long double * times_per_thread = new long double[n_partitions + 1];
+  for (size_t j = 0; j < n_partitions + 1 ; j++)
+    times_per_thread[j] = 0;
 
-  // TODO:
-  // This is the BAM header, probable KernelBWA should take care of this...
+  // This is the BAM header, probably KernelManager should take care of this?
   vector<string> header = book_keeper->SamHeader();
   if(kernel_type!=KernelType::BLAST)
-  for (size_t i = 0; i < header.size(); i++) {
-      my_out << header[i] << endl;
-  }
-  my_out << "@PG\tID:CHIC\tVN:0.1" << endl;
-
-  for (size_t i = 0; i < my_occs.size(); i++) {
-    book_keeper->NormalizeOutput(my_occs[i], kernel_type);
-    my_out << my_occs[i].GetMessage() << endl;
-  }
-  for (size_t i = 0; i < unmapped_occs.size(); i++) {
-    // TODO: verify is those also need some kind of normalization.
-    my_out << unmapped_occs[i].GetMessage() << endl;
-  }
-}
-
-void HybridLZIndex::FindFQ2(char * alignment_filename,
-                           bool single_file_paired,
-                           SecondaryReportType secondary_report,
-                           vector<string> kernel_options,
-                           ostream& my_out) const {
-  vector<Occurrence> my_occs;
-  vector<Occurrence> unmapped_occs;
-  FindPrimaryOccsFQ2(&my_occs,
-                    &unmapped_occs,
-                    secondary_report,
-                    alignment_filename,
-                    single_file_paired,
-                    kernel_options);
-  if (secondary_report == SecondaryReportType::ALL ||
-      secondary_report == SecondaryReportType::LZ) {
-    searchSecondaryOcc(&my_occs);
-  }
-
-  // TODO:
-  // This is the BAM header, probable KernelBWA should take care of this...
-  vector<string> header = book_keeper->SamHeader();
   for (size_t i = 0; i < header.size(); i++) {
     my_out << header[i] << endl;
   }
   my_out << "@PG\tID:CHIC\tVN:0.1" << endl;
 
-  for (size_t i = 0; i < my_occs.size(); i++) {
-    book_keeper->NormalizeOutput(my_occs[i], kernel_type);
-    my_out << my_occs[i].GetMessage() << endl;
-  }
-  for (size_t i = 0; i < unmapped_occs.size(); i++) {
-    // TODO: verify is those also need some kind of normalization.
-    my_out << unmapped_occs[i].GetMessage() << endl;
-  }
-}
+  bool retrieve_all = (secondary_report == SecondaryReportType::ALL);
+  t1 = Utils::wclock();
+  string tmp_sam_filename = kernel_manager->LocateOccsFQ(query_filename,
+                                                     mates_filename,
+                                                     retrieve_all,
+                                                     single_file_paired,
+                                                     kernel_options);
+  t2 = Utils::wclock();
+  cerr << "LocateOccsFQ took: "<< (t2-t1) << " seconds. " << endl;
 
-void HybridLZIndex::FindALL(vector<Occurrence> my_occs,
-                           char * query_filename,
-                           char * mates_filename,
-                           bool single_file_paired,
-                           SecondaryReportType secondary_report,
-                           vector<string> kernel_options,
-                           ostream& my_out) const {
+  size_t sam_chunk_size = 1000;
+	SamReader sam_reader(tmp_sam_filename, sam_chunk_size, n_partitions, verbose);
+  Occurrence * primary_buffer = new Occurrence[n_partitions * sam_chunk_size];
+  Occurrence * primary_buffer_ALT = new Occurrence[n_partitions * sam_chunk_size];
+  size_t primary_buffer_len;
+  size_t primary_buffer_ALT_len = 0;
 
-    size_t all_occs_in_kernel = my_occs.size();
-    if (verbose >= 2) {
-        cout << "Occurrences mapped to kernel: " << all_occs_in_kernel << endl;
-    }
-    vector<Occurrence> lost_occs;
-    if (all_occs_in_kernel > 0) { // seems redundant.
-        for (size_t i = 0; i < all_occs_in_kernel; i++) {
-            if (my_occs[i].IsUnmapped()) {
+  vector<vector<Occurrence>> data_1((uint)n_threads);
+  vector<vector<Occurrence>> data_2((uint)n_threads);
+  vector<vector<Occurrence>> * secondary_per_thread = &(data_1);
+  vector<vector<Occurrence>> * secondary_per_thread_ALT = &(data_2);
 
-                    cout << "Discarding unmapped read from alignments to kernel" << endl;
 
-                continue;
-            }
-            uint64_t next_limit_pos = 0;
-            uint prev_limit;
-            uint64_t pos_in_text = MapKernelPosToTextPos(my_occs[i].GetPos(),
-                                                         &next_limit_pos,
-                                                         & prev_limit);
-            cout << "Position in real text:" << pos_in_text << endl;
-            cout << "Position in kernel:" << my_occs[i].GetPos() << endl;
-            //book_keeper->NormalizeOutput(my_occs[i]);
-            //cout << "Normalized pos :" << my_occs[i].GetPos() << endl;
-            //TODO: store sequence(chr) lengths in file and calculate ancsestor from real text position, put ancestor in occurrence message
-
-            cout << "name:" << my_occs[i].GetReadName() << endl;
-            cout << "len:" << my_occs[i].GetLength() << endl;
-            cout << "message:" << my_occs[i].GetMessage() << endl;
-            vector<string> my_seqs = kernel_manager->ExtractSequences(pos_in_text, my_occs[i].GetLength());
-            for (size_t j = 1; j < my_seqs.size(); j++) {
-                string s = my_seqs[j];
-                cout << "Sequence in position " << pos_in_text << " : "<< s << " :: " << endl;
-                cout << "WTF" << endl;
-            }
-
-            if (next_limit_pos <= my_occs[i].GetPos() + my_occs[i].GetLength() - 1 ||
-                tsrr->IsLiteral(prev_limit)) {
-                if(kernel_type==KernelType::BLAST)
-                    my_occs[i].UpdatePosBlast(pos_in_text);
-                else my_occs[i].UpdatePos(pos_in_text);
-            } else {
-                lost_occs.push_back(my_occs[i]);
-                if (verbose >= 3) {
-                    cout << "Warning: if we had a kernel that could handle the special separators" << endl;
-                    cout << "as characters that differ from everything else (as opposed to N's) "<< endl;
-                    cout << "then this should never happen. Here we are losing a mapped read. "<< endl;
-                    cout << "It may be the case that there was another position where it could be mapped, but this artifact alignment";
-                    cout << "took presedence over the next one" << endl;
-                    cout << "*********" << endl;
-                    cout << "We just lost read aligned to Kernel Pos:" << my_occs[i].GetPos();
-                    cout << "*********" << endl;
-                }
-            }
+  sam_reader.ReadOccurrences(primary_buffer, n_partitions * sam_chunk_size, &primary_buffer_len);
+  while (primary_buffer_len != 0) {
+#ifdef _OPENMP
+  omp_set_num_threads(n_threads);
+#endif
+#pragma omp parallel for
+    for (size_t t = 0; t < n_partitions + 1; t++) {
+    t1 = Utils::wclock();
+      if (t == n_partitions) {
+        for (size_t i = 0; i < primary_buffer_ALT_len; i++) {
+          my_out << primary_buffer_ALT[i].GetSamRecord() << "\n";
         }
+        for (size_t tt = 0; tt < secondary_per_thread_ALT->size(); tt++) {
+          for (size_t i = 0; i < (secondary_per_thread_ALT->at(tt)).size(); i++) {
+            my_out << (secondary_per_thread_ALT->at(tt))[i].GetSamRecord() << "\n";
+          }
+          secondary_per_thread_ALT->at(tt).clear();
+        }
+        // INPUT:
+        if (!sam_reader.IsReady()) {
+          sam_reader.ReadOccurrences(primary_buffer_ALT, n_partitions * sam_chunk_size, &primary_buffer_ALT_len);
+        } else {
+          primary_buffer_ALT_len = 0;
+        }
+      } else {
+        size_t thread_starting_pos = t*((primary_buffer_len)/n_partitions);
+        size_t thread_length = (t != n_partitions - 1) ? (primary_buffer_len/n_partitions) : primary_buffer_len - thread_starting_pos;
+        size_t thread_ending_pos = thread_starting_pos + thread_length;
+
+        for (size_t kk = thread_starting_pos; kk < thread_ending_pos; kk++) {
+            if(kernel_type!=KernelType::BLAST) primary_buffer[kk].Init();
+            else primary_buffer[kk].InitBlast();
+        }
+        ASSERT(secondary_per_thread->at(t).size() == 0);
+        KernelOccsToPrimaryOccsFQ(&(primary_buffer[thread_starting_pos]),
+                                  thread_length,
+                                  secondary_report);
+
+
+        if (secondary_report == SecondaryReportType::ALL ||
+            secondary_report == SecondaryReportType::LZ) {
+          searchSecondaryOcc(&(primary_buffer[thread_starting_pos]),
+                             thread_length,
+                             &(secondary_per_thread->at(t)));
+        }
+        for (size_t kk = thread_starting_pos; kk < thread_ending_pos; kk++) {
+          book_keeper->NormalizeOutput(primary_buffer[kk], kernel_type);
+        }
+        for (size_t i = 0; i < (secondary_per_thread->at(t)).size(); i++) {
+          book_keeper->NormalizeOutput(secondary_per_thread->at(t)[i], kernel_type);
+        }
+      }
+  	  t2 = Utils::wclock();
+		  times_per_thread[t] += (t2-t1);
     }
-    size_t tot_map_to_kernel = my_occs.size();
 
-        cout << "Total occurrence mapped  to the kernel:" << tot_map_to_kernel << endl;
-    cout << "Total not mapped  to the kernel:" << lost_occs.size() << endl;
-    // TODO:
-    // This is the BAM header, probable KernelBWA should take care of this...
+    Occurrence * tmp_buff = primary_buffer;
+    primary_buffer = primary_buffer_ALT;
+    primary_buffer_ALT = tmp_buff;
 
-    /*for (size_t i = 0; i < my_occs.size(); i++) {
-       //cout << "Occurrence:" << endl;
-        cout << my_occs[i].GetMessage() << endl;
+    size_t tmp_len = primary_buffer_len;
+    primary_buffer_len  = primary_buffer_ALT_len;
+    primary_buffer_ALT_len = tmp_len;
+
+    vector<vector<Occurrence>> * tmp_sec = secondary_per_thread;
+    secondary_per_thread = secondary_per_thread_ALT;
+    secondary_per_thread_ALT = tmp_sec;
+  }
+  for (size_t i = 0; i < primary_buffer_ALT_len; i++) {
+    my_out << primary_buffer_ALT[i].GetSamRecord() << "\n";
+  }
+  for (size_t t = 0; t < secondary_per_thread_ALT->size(); t++) {
+    for (size_t i = 0; i < (secondary_per_thread_ALT->at(t)).size(); i++) {
+      my_out << (secondary_per_thread_ALT->at(t))[i].GetSamRecord() << "\n";
     }
-    for (size_t i = 0; i < my_occs.size(); i++) {
-        cout << "Normalized Occurrences:" << endl;
-        book_keeper->NormalizeOutput(my_occs[i]);
-        cout << my_occs[i].GetMessage() << endl;
-    }*/
+  }
 
-    if (secondary_report == SecondaryReportType::ALL ||
-           secondary_report == SecondaryReportType::LZ) {
-        searchSecondaryOcc(&my_occs);
-    }
+  delete [] primary_buffer;
+  delete [] primary_buffer_ALT;
 
+  for (size_t j = 0; j < n_partitions + 1; j++) {
+    cerr << "thread " << j << " took: " << times_per_thread[j] << endl;
+  }
+  delete [] times_per_thread;
+  /*
+  cerr << "Pre , sequential took: "<< (t_pre) << " seconds. " << endl;
+ 	cerr << "Parallel section took: "<< (t_parallel) << " seconds. " << endl;
+  cerr << "Post, sequential took: "<< (t_post) << " seconds. " << endl;
+  */
 }
 
 void HybridLZIndex::Find(vector<uint64_t> * ans, string query) const {
   ASSERT(ans->size() == 0);
-  //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
+  // ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
   ASSERT(query.size() <= max_query_len);
-  if (verbose >= 4) {
-    cout << "Query string:" << endl;
-    cout << query << endl;
+  if (verbose >= 3) {
+    cerr << "Query string:" << endl;
+    cerr << query << endl;
   }
   vector<Occurrence> my_occs;
 
@@ -1113,242 +883,98 @@ void HybridLZIndex::Find(vector<uint64_t> * ans, string query) const {
   }
 }
 
-void HybridLZIndex::FindPatterns(vector<Occurrence> * ans, string query) const {
-    ASSERT(ans->size() == 0);
-    //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
-    ASSERT(query.size() <= max_query_len);
-    if (verbose >= 4) {
-        cout << "Query string:" << endl;
-        cout << query << endl;
-    }
-    vector<Occurrence> my_occs;
-
-    FindPrimaryOccs(&my_occs, query);
-    //searchSecondaryOcc(&my_occs);
-    for (size_t i = 0; i < my_occs.size(); i++) {
-        ans->push_back(my_occs[i]);
-    }
-}
-
-void HybridLZIndex::Find(vector<string> *ans, vector<uint64_t> position, uint64_t range) const {
-    ASSERT(ans->size() == 0);
-    //ASSERT(query.size() <= context_len);  // THAT WAS AN ERROR!
-
-    /*if (verbose >= 4) {
-        cout << "Pos 0" << endl;
-        cout << position[0] << endl;
-    }*/
-
-
-    for (size_t i = 0; i < position.size(); i++) {
-        vector<string> my_seqs = kernel_manager->ExtractSequences(position[i], range);
-        cout << my_seqs[0] <<  " :: " << endl;
-        cout << my_seqs[1] <<  " :: " << endl;
-        cout << my_seqs[2] <<  " :: " << endl;
-        cout << my_seqs[3] <<  " :: " << endl;
-        cout << my_seqs[4] <<  " :: " << endl;
-        cout << "BLB" << endl;
-        for (size_t j = 1; j < my_seqs.size(); j++) {
-            string s = my_seqs[j];
-            cout << "Sequence in position " << position[i] << " : "<< s << " :: " << endl;
-            cout << "WTF" << endl;
-        }
-
-        /*const std::basic_string<char> &seqs = extract(index, position-range, position+range);
-        vector<string> ans;
-        ans.reserve(seqs.size());
-        for (size_t i = 0; i < seqs.size(); i++) {
-            ans.push_back(seqs);
-        }
-        return ans;*/
-
-
-        ans->push_back(my_seqs[i]);
-    }
-}
-
 // TODO: move somewhere
 bool ListContainsName(vector<Occurrence> * list, string name);
 bool ListContainsName(vector<Occurrence> * list, string name) {
   for (size_t i = 0; i < list->size(); i++) {
-    if(name == list->at(i).GetReadName()) {
+    if (name == list->at(i).GetReadName()) {
       return true;
     }
   }
   return false;
 }
 
-void HybridLZIndex::FindPrimaryOccsFQ(vector<Occurrence> * ans,
-                                      vector<Occurrence> * unmapped,
-                                      SecondaryReportType secondary_report,
-                                      char * query_filename,
-                                      char * mates_filename,
-                                      bool single_file_paired,
-                                      vector<string> kernel_options) const {
-  bool retrieve_all = (secondary_report == SecondaryReportType::ALL);
-  vector<Occurrence> locations = kernel_manager->LocateOccsFQ(query_filename,
-                                                              mates_filename,
-                                                              retrieve_all,
-                                                              single_file_paired,
-                                                              kernel_options);
+void HybridLZIndex::KernelOccsToPrimaryOccsFQ(Occurrence * kernel_occs,
+                                              size_t kernel_occs_len,
+                                              SecondaryReportType secondary_report) const {
+  // This was used when we were checking for lost reads. this is not done anymore.
+  // bool retrieve_all = (secondary_report == SecondaryReportType::ALL);
 
-  size_t all_occs_in_kernel = locations.size();
   if (verbose >= 2) {
-    cout << "Occurrences mapped to kernel: " << all_occs_in_kernel << endl;
+    cerr << "Occurrences mapped to kernel: " << kernel_occs_len << endl;
   }
   vector<Occurrence> lost_occs;
-  if (all_occs_in_kernel > 0) { // seems redundant.
-    for (size_t i = 0; i < all_occs_in_kernel; i++) {
-      if (locations[i].IsUnmapped()) {
-        unmapped->push_back(locations[i]);
-        if (verbose >= 3) {
-          cout << "Discarding unmapped read from alignments to kernel" << endl;
-        }
-        continue;
-      }
-      uint64_t next_limit_pos = 0;
-      uint prev_limit;
-      uint64_t pos_in_text = MapKernelPosToTextPos(locations[i].GetPos(),
-                                                   &next_limit_pos,
-                                                   & prev_limit);
-
-      if (next_limit_pos <= locations[i].GetPos() + locations[i].GetLength() - 1 ||
-          tsrr->IsLiteral(prev_limit)) {
-          if(kernel_type==KernelType::BLAST){
-              locations[i].UpdatePosBlast(pos_in_text);
-          }else
-              locations[i].UpdatePos(pos_in_text);
-        ans->push_back(locations[i]);
-      } else {
-        lost_occs.push_back(locations[i]);
-        if (verbose >= 3) {
-          cout << "Warning: if we had a kernel that could handle the special separators" << endl;
-          cout << "as characters that differ from everything else (as opposed to N's) "<< endl;
-          cout << "then this should never happen. Here we are losing a mapped read. "<< endl;
-          cout << "It may be the case that there was another position where it could be mapped, but this artifact alignment";
-          cout << "took presedence over the next one" << endl;
-          cout << "*********" << endl;
-          cout << "We just lost read aligned to Kernel Pos:" << locations[i].GetPos();
-          cout << "*********" << endl;
-        }
+  for (size_t i = 0; i < kernel_occs_len; i++) {
+    if ((kernel_occs[i]).IsUnmapped()) {
+      continue;
+    }
+    uint64_t next_limit_pos = 0;
+    uint prev_limit;
+    uint64_t pos_in_text = MapKernelPosToTextPos(kernel_occs[i].GetPos(),
+                                                 &next_limit_pos,
+                                                 & prev_limit);
+    if (next_limit_pos <= kernel_occs[i].GetPos() + kernel_occs[i].GetLength() - 1 ||
+        tsrr->IsLiteral(prev_limit) ||
+        secondary_report != SecondaryReportType::ALL) {
+        if(kernel_type==KernelType::BLAST)
+            kernel_occs[i].UpdatePosBlast(pos_in_text);
+        else kernel_occs[i].UpdatePos(pos_in_text);
+    } else {
+      lost_occs.push_back(kernel_occs[i]);
+      if (verbose >= 0) {
+        cerr << "Warning:" << endl;
+        cerr << "This is an important difference between the theory of Hybrid Index and usind a read aligner for the kernel. "<< endl;
+        cerr << "Results should be checked..." << endl;
+        cerr << "*********" << endl;
+        cerr << "We just lost read aligned to Kernel Pos:" << kernel_occs[i].GetPos();
+        cerr << "*********" << endl;
       }
     }
   }
-  size_t tot_map_to_kernel = locations.size();
-  size_t unmapped_to_kernel = unmapped->size();
-  if (verbose) {
-    cout << "Total occurrence mapped  to the kernel:" << tot_map_to_kernel << endl;
-    cout << "Total occurrence NOT MAP to the kernel:" << unmapped_to_kernel << endl;
-  }
-  if (verbose >= 3) {
-    CreateSamRecordsForTrulyLostAlignments(&lost_occs, unmapped, ans, retrieve_all);
-  }
+
+  // CreateSamRecordsForTrulyLostAlignments(&lost_occs, kernel_occs, retrieve_all);
 }
 
-void HybridLZIndex::FindPrimaryOccsFQ2(vector<Occurrence> * ans,
-                                      vector<Occurrence> * unmapped,
-                                      SecondaryReportType secondary_report,
-                                      char * alignment_filename,
-                                      bool single_file_paired,
-                                      vector<string> kernel_options) const {
-  bool retrieve_all = (secondary_report == SecondaryReportType::ALL);
-
-  vector<Occurrence> locations;
-  if(kernel_type==KernelType::BLAST)
-      locations = KernelManagerBLAST::SamOccurrences(alignment_filename);
-  else
-      locations = KernelManagerBWA::SamOccurrences(alignment_filename);
-
-      size_t all_occs_in_kernel = locations.size();
-  if (verbose >= 2) {
-    cout << "Occurrences mapped to kernel: " << all_occs_in_kernel << endl;
-  }
-  vector<Occurrence> lost_occs;
-  if (all_occs_in_kernel > 0) { // seems redundant.
-    for (size_t i = 0; i < all_occs_in_kernel; i++) {
-      if (locations[i].IsUnmapped()) {
-        unmapped->push_back(locations[i]);
-        if (verbose >= 3) {
-          cout << "Discarding unmapped read from alignments to kernel" << endl;
-        }
-        continue;
-      }
-      uint64_t next_limit_pos = 0;
-      uint prev_limit;
-      uint64_t pos_in_text = MapKernelPosToTextPos(locations[i].GetPos(),
-                                                   &next_limit_pos,
-                                                   & prev_limit);
-      if (next_limit_pos <= locations[i].GetPos() + locations[i].GetLength() - 1 ||
-          tsrr->IsLiteral(prev_limit) ||
-          secondary_report != SecondaryReportType::ALL) {
-          if(kernel_type==KernelType::BLAST)
-              locations[i].UpdatePosBlast(pos_in_text);
-          else locations[i].UpdatePos(pos_in_text);
-        ans->push_back(locations[i]);
-      } else {
-        lost_occs.push_back(locations[i]);
-        if (verbose >= 0) {
-          cout << "Warning:" << endl;
-          cout << "This is an important difference between the theory of Hybrid Index and usind a read aligner for the kernel. "<< endl;
-          cout << "Results should be checked..." << endl;
-          cout << "*********" << endl;
-          cout << "We just lost read aligned to Kernel Pos:" << locations[i].GetPos();
-          cout << "*********" << endl;
-        }
-      }
-    }
-  }
-  size_t tot_map_to_kernel = locations.size();
-  size_t unmapped_to_kernel = unmapped->size();
-  if (verbose) {
-    cout << "Total occurrence mapped  to the kernel:" << tot_map_to_kernel << endl;
-    cout << "Total occurrence NOT MAP to the kernel:" << unmapped_to_kernel << endl;
-  }
-  CreateSamRecordsForTrulyLostAlignments(&lost_occs, unmapped, ans, retrieve_all);
-}
-
+// This would work if all reads were processed at once.
+// It should be rewritten, or deleted; current implementation could "lose" reads,
+// in the sense that they are not reported as unaligned, but simply do not appear in the output.
+/*
 void HybridLZIndex::CreateSamRecordsForTrulyLostAlignments(vector<Occurrence> * lost_occs,
-                                                           vector<Occurrence> * unmapped,
-                                                           vector<Occurrence> * ans,
+                                                           Occurrence * kernel_occs,
+                                                           size_t kernel_occs_len,
                                                            bool retrieve_all) const {
   std::ofstream ofs;
   ofs.open ("MisAlignedAndLost.fq");
-  //  TODO: to improve time in case that...retrieve_all = true;
   int64_t truly_lost = 0;
   long double t1, t2;
   t1 = Utils::wclock();
   for (size_t i = 0; i < lost_occs->size(); i++) {
     string read_name = lost_occs->at(i).GetReadName();
-    // if retrieve_all == false 
+    // if retrieve_all == false
     // we can assume that ListContainsName => false
     if (!retrieve_all || !ListContainsName(ans, read_name)) {
       truly_lost++;
-      ofs << lost_occs->at(i).GetMessage() << endl;
-      unmapped->push_back(Utils::SamRecordForUnmapped(lost_occs->at(i).GetReadName()));
-    } 
+      ofs << lost_occs->at(i).GetSamRecord() << endl;
+      ans->push_back(Utils::SamRecordForUnmapped(lost_occs->at(i).GetReadName()));
+    }
   }
   t2 = Utils::wclock();
-  if (verbose) {
-    cout << "Check for truly lost reads:: "<< (t2-t1) << " seconds. " << endl;
-    cout << "Truly lost reads (aligned over a separator): " << truly_lost << endl;
-    cout << "(CHIC created a SAM unmapped-record for them)" << endl;
+  if (verbose >= 2) {
+    cerr << "Check for truly lost reads:: "<< (t2-t1) << " seconds. " << endl;
+    cerr << "Truly lost reads (aligned over a separator): " << truly_lost << endl;
+    cerr << "(CHIC created a SAM unmapped-record for them)" << endl;
   }
   ofs.close();
 
 }
+*/
 
 void HybridLZIndex::FindPrimaryOccs(vector<Occurrence> * ans, string query) const {
   vector<Occurrence> locations = kernel_manager->LocateOccs(query);
   // TODO: may be more efficient if we change the signature of this method, and we return locations.
   // we will need to do in-place filter instead of the push_backs that follows.
-
   size_t all_occs_in_kernel = locations.size();
-    for (size_t i = 0; i < all_occs_in_kernel; i++) {
-
-            ans->push_back(locations[i]);
-
-    }
-  /*if (all_occs_in_kernel > 0) {  // TODO: this if seems redundant too
+  if (all_occs_in_kernel > 0) {  // TODO: this if seems redundant too
     for (size_t i = 0; i < all_occs_in_kernel; i++) {
       uint64_t next_limit_pos = 0;
       uint prev_limit;
@@ -1357,11 +983,13 @@ void HybridLZIndex::FindPrimaryOccs(vector<Occurrence> * ans, string query) cons
                                                    & prev_limit);
       if (next_limit_pos <= locations[i].GetPos() + query.size() - 1 ||
           tsrr->IsLiteral(prev_limit)) {
-        locations[i].UpdatePos(pos_in_text);
+          if(kernel_type==KernelType::BLAST)
+              locations[i].UpdatePosBlast(pos_in_text);
+          else locations[i].UpdatePos(pos_in_text);
         ans->push_back(locations[i]);
       }
     }
-  }*/
+  }
 }
 
 void HybridLZIndex::searchSecondaryOcc(vector<Occurrence> * ans,
@@ -1374,6 +1002,8 @@ void HybridLZIndex::searchSecondaryOcc(vector<Occurrence> * ans,
   }
   size_t n_sec = 0;
   for (size_t i = 0; i < ans->size(); i++) {
+    if (ans->at(i).IsUnmapped())
+      continue;
     size_t curr_pos = ans->at(i).GetPos();
     size_t curr_m = ans->at(i).GetLength();
     vector<uint64_t> tmp_ans;
@@ -1395,6 +1025,49 @@ void HybridLZIndex::searchSecondaryOcc(vector<Occurrence> * ans,
   }
 }
 
+void HybridLZIndex::searchSecondaryOcc(Occurrence * kernel_occs,
+                                       size_t kernel_occs_len,
+                                       vector<Occurrence> * second) const {
+  if (tsrr->GetNPhrasesGrid() == 0) {
+    return;
+  }
+  for (size_t i = 0; i < kernel_occs_len; i++) {
+    if (kernel_occs[i].IsUnmapped())
+      continue;
+    size_t curr_pos = kernel_occs[i].GetPos();
+    size_t curr_m = kernel_occs[i].GetLength();
+    vector<uint64_t> phrases_that_cover;
+    tsrr->queryRR(curr_pos, curr_pos + curr_m - 1, &phrases_that_cover);
+
+    for (size_t j = 0; j < phrases_that_cover.size(); j++) {
+      size_t pos = phrases_that_cover[j];
+      size_t posLim = tsrr->GetPtr(pos);
+      size_t real_pos = GetLimit(posLim) + curr_pos - tsrr->GetX(pos);
+      second->push_back(kernel_occs[i]);  // this makes a coppy, invoking the copy constructor.
+        if(kernel_type==KernelType::BLAST)
+            second->back().UpdatePosBlast(real_pos, "", (int)256);
+        else second->back().UpdatePos(real_pos, "", (int)256);
+    }
+  }
+  for (size_t i = 0; i < second->size(); i++) {
+    if (second->at(i).IsUnmapped())
+      continue;
+    size_t curr_pos = second->at(i).GetPos();
+    size_t curr_m = second->at(i).GetLength();
+    vector<uint64_t> phrases_that_cover;
+    tsrr->queryRR(curr_pos, curr_pos + curr_m - 1, &phrases_that_cover);
+
+    for (size_t j = 0; j < phrases_that_cover.size(); j++) {
+      size_t pos = phrases_that_cover[j];
+      size_t posLim = tsrr->GetPtr(pos);
+      size_t real_pos = GetLimit(posLim) + curr_pos - tsrr->GetX(pos);
+      second->push_back(second->at(i));  // this makes a coppy, invoking the copy constructor.
+        if(kernel_type==KernelType::BLAST)
+            second->back().UpdatePosBlast(real_pos, "", (int)256);
+        else second->back().UpdatePos(real_pos, "", (int)256);
+    }
+  }
+}
 
 uint64_t HybridLZIndex::MapKernelPosToTextPos(uint64_t pos,
                                               uint64_t * _next_limit_pos,
@@ -1403,7 +1076,7 @@ uint64_t HybridLZIndex::MapKernelPosToTextPos(uint64_t pos,
   ASSERT(succ > 0);
   *pred = succ-1;
   uint64_t offset = (*_next_limit_pos) - pos;
-    //cout << "SUCCessor: "<< succ << endl;
+
   return GetLimit(succ) - offset;
 }
 

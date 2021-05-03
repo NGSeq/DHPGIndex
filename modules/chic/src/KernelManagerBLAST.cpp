@@ -13,10 +13,11 @@ KernelManagerBLAST::KernelManagerBLAST() {
 }
 
 KernelManagerBLAST::KernelManagerBLAST(uchar * input_kernel_text,
-                                           size_t input_len,
-                                           int threads,
-                                           char * _kernel_text_filename,
-                                           int _verbose) {
+                                       size_t input_len,
+                                       char * _kernel_text_filename,
+                                       int _n_threads,
+                                       int _max_memory_MB,
+                                       int _verbose) {
   verbose = _verbose;
   if (verbose >=2) {
     cout << "++++++++++++++++++++++++++++" << endl;
@@ -114,7 +115,7 @@ void KernelManagerBLAST::CreateKernelTextFile(uchar * _kernel_text, size_t _kern
   fclose(fp);
 }
 
-vector<Occurrence> KernelManagerBLAST::SamOccurrences(const char * sam_filename) {
+/*vector<Occurrence> KernelManagerBLAST::SamOccurrences(const char * sam_filename) {
   vector<Occurrence> ans;
   std::ifstream ifile;
   ifile.open(sam_filename);
@@ -129,15 +130,15 @@ vector<Occurrence> KernelManagerBLAST::SamOccurrences(const char * sam_filename)
     ans.push_back(Occurrence(line, true));
   }
   return ans;
-}
+}*/
 
-vector<Occurrence>  KernelManagerBLAST::LocateOccsFQ(char * query_filename,
+string  KernelManagerBLAST::LocateOccsFQ(char * query_filename,
                                                        char * mates_filename,
                                                        bool retrieve_all,
                                                        bool single_file_paired,
                                                        vector<string> kernel_options) const {
   sdsl::int_vector<64u> locations;
-  vector<Occurrence> ans;
+  //vector<Occurrence> ans;
 
 #ifndef PROJECT_ROOT
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
@@ -181,11 +182,11 @@ vector<Occurrence>  KernelManagerBLAST::LocateOccsFQ(char * query_filename,
     exit(EXIT_FAILURE);
   }
 
-  ans = KernelManagerBLAST::SamOccurrences(tmp_out_filename.c_str());
+  /*ans = KernelManagerBLAST::SamOccurrences(tmp_out_filename.c_str());
   if (verbose) {
     cout << ans.size() << " records w/r/to kernel" << endl;
-  }
-  return ans;
+  }*/
+  return tmp_out_filename;
 #endif
 }
 
