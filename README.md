@@ -25,7 +25,7 @@ Compile and Install needed packages by running:
 ```
 
 ### Cluster setup
-Automated installation with Hadoop distributions such as Hortonworks HDP or Cloudera CDH.
+Automated installation with Hadoop distributions such as Cloudera CDH or by using some cloud service provider.
 
 or
 
@@ -55,7 +55,7 @@ Modify the number of cluster nodes and static paths to fit your configuration in
 
 LOCALINDEXPATH=/mnt/tmp #Intermediate files and the final index are stored here
 
-HDFSURI=hdfs://node-1:8020
+HDFSURI=hdfs://node-1:8020 #HDFS namenode address
 
 NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starting from 1.
 
@@ -97,7 +97,7 @@ STDREFPATH=/data/grch37 #Standard reference genome files in FASTA format. Files 
 
 VCFPATH=/data/vcfs #VCF files aligned to standard reference with vcf2multialign to generate pangenome. VCF files must be divided by chromosomes and named chrN.vcf N=1..22
 
-HDFSURI=hdfs://node-1:8020
+HDFSURI=hdfs://node-1:8020 #HDFS namenode address
 
 NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starting from 1.
 
@@ -119,7 +119,6 @@ Note
 
 * At least 2x size of pan-genome in master node is required for local storage and worker nodes should have storage at least 2x of chromosomal pan-genome data size.
 * Everything is tested using CentOS 7 with openjdk 1.8
-* Each FASTA file should contain a single line.
 
 
 
