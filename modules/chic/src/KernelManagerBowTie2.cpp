@@ -50,7 +50,7 @@ KernelManagerBowTie2::KernelManagerBowTie2(
 #else
     //string bt2_command_index = string(PROJECT_ROOT);
     cout << std::to_string(n_threads) << endl;
-  std::string bt2_command_index = "/opt/bowtie2/";
+  std::string bt2_command_index = "";
   bt2_command_index += "bowtie2-build --threads "+std::to_string(threads);
   bt2_command_index += " " + kernel_text_filename;
   bt2_command_index += " " + kernel_text_filename;
@@ -95,8 +95,8 @@ KernelManagerBowTie2::KernelManagerBowTie2(uchar * input_kernel_text,
   cerr << "PROJECT ROOT NOT DEFINED, DID YOU MODIFY THE MAKEFILE ?" << endl;
   exit(-1);
 #else
-  string bt2_command_index = string(PROJECT_ROOT);
-  bt2_command_index += "/ext/BOWTIE2/bowtie2-2.3.5.1/bowtie2-build";
+  string bt2_command_index = "";
+  bt2_command_index += "bowtie2-build";
   bt2_command_index += " --threads="+std::to_string(n_threads);
 	if (input_len > (2ul<<30) && _max_memory_MB < 32000) {
 		// if Bowtie "test ahead" was not killed this should not be necessary.
@@ -173,8 +173,8 @@ string KernelManagerBowTie2::LocateOccsFQ(char * query_filename,
   for (size_t i = 0; i < kernel_options.size(); i++) {
     all_flags += " "+kernel_options[i];
   }
-  bt2_command_align.assign(PROJECT_ROOT);
-  bt2_command_align += "/ext/BOWTIE2/bowtie2-2.3.5.1/bowtie2 " + all_flags;
+
+  bt2_command_align += "bowtie2 " + all_flags;
   bt2_command_align += " -x " + kernel_text_filename;  // we have used kernel_text_filename as basename for the index, should be ok.
   if (mates_filename == NULL) {
     bt2_command_align += " -U "+ string(query_filename);

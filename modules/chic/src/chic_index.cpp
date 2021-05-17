@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
       /* These options don’t set a flag.
          We distinguish them by their indices. */
       {"kernel",    required_argument, 0, 'K'},
+      {"kernelize",    required_argument, 0, 'Z'},
       {"indexing",    required_argument, 0, 'I'},
       {"lz-parsing-method",    required_argument, 0, 'M'},
       {"lz-input-plain-file",    required_argument, 0, 'F'},
@@ -69,7 +70,7 @@ int main(int argc, char **argv) {
     /* getopt_long stores the option index here. */
     int option_index = 0;
 
-    int c = getopt_long(argc, argv, "K:I:M:F:G:k:o:v:m:r:t:h", long_options, &option_index);
+    int c = getopt_long(argc, argv, "K:Z:I:M:F:G:k:o:v:m:r:t:h", long_options, &option_index);
 
     // TODO: Sanitize args, I'm doing a blind atoi.
     /* Detect the end of the options. */
@@ -105,7 +106,11 @@ int main(int argc, char **argv) {
         }
         break;
 
-      case 'I':
+        case 'Z':
+            parameters->kernelizeonly = 1;
+            break;
+
+        case 'I':
             parameters->indexingonly = 1;
             break;
 

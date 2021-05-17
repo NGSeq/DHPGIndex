@@ -91,12 +91,12 @@ KernelManagerBWA::KernelManagerBWA(uchar * input_kernel_text,
   char * command_bwa_index= new char[1024];
   if (verbose >= 3) {
 	  sprintf(command_bwa_index,
-  	        "%s/ext/BWA/bwa-0.7.12/bwa index %s 1>&2",
+  	        "%sbwa index %s 1>&2",
     	      PROJECT_ROOT,
         	  kernel_text_filename.c_str());
 	} else {
   	sprintf(command_bwa_index,
-    	      "%s/ext/BWA/bwa-0.7.12/bwa index %s >%s.log_bwaindex 2>&1",
+    	      "%sbwa index %s >%s.log_bwaindex 2>&1",
       	    PROJECT_ROOT,
         	  kernel_text_filename.c_str(),
           	kernel_text_filename.c_str());
@@ -162,7 +162,7 @@ string  KernelManagerBWA::LocateOccsFQ(char * query_filename,
     all_flags += " "+kernel_options[i];
   }
   command_bwa_mem.assign(PROJECT_ROOT);
-  command_bwa_mem += "/ext/BWA/bwa-0.7.12/bwa mem " + all_flags;
+  command_bwa_mem += "bwa mem " + all_flags;
   command_bwa_mem += " " + kernel_text_filename;
   command_bwa_mem += " " + string(query_filename);
   if (mates_filename != NULL) {

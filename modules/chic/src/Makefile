@@ -15,7 +15,7 @@ LZ_FILES=../ext/LZ/LZscan/algorithm/lcp.cpp ../ext/LZ/LZscan/algorithm/parse.cpp
 
 OBJECTS=utils.o RangeReporting.o BookKeeper.o fasta.o KernelManagerFMI.o KernelManagerBWA.o KernelManagerBowTie2.o KernelManagerBLAST.o HybridLZIndex.o LempelZivParser.o SamReader.o
 
-CHICA_BINS=chic_index chic_align
+CHICA_BINS=chic_index chic_align chic_map
 CHICO_BINS=build_index load_index
 
 %.o: %.cpp
@@ -54,6 +54,11 @@ load_index: load_index.cpp $(OBJECTS)
 chic_align: chic_align.cpp $(OBJECTS)
 	@echo " [BLD] Building chic_align"
 	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o chic_align chic_align.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
+
+
+chic_map: chic_map.cpp $(OBJECTS)
+	@echo " [BLD] Building chic_map"
+	@$(MY_CXX) $(CXX_FLAGS) $(INCLUDES) -o chic_map chic_map.cpp $(LZ_FILES) $(OBJECTS) $(LIB)
 
 types: types.vim
 types.vim: *.[ch]

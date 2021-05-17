@@ -95,12 +95,20 @@ HybridLZIndex::HybridLZIndex(BuildParameters * parameters) {
   this->index_prefix = parameters->output_filename;
   SetFileNames();
 
+  if(parameters->kernelizeonly==1){
+      if(parameters->indexingonly==1)
+          Build();
+      else
+          InitKernelizeonly();
+
+  }else{
       if(parameters->indexingonly==1)
           Indexing();
       else{
           Build();
       }
 
+  }
 }
 
 void HybridLZIndex::Build() {
@@ -167,68 +175,100 @@ void HybridLZIndex::Indexing() {
     }
 }
 
-
-void HybridLZIndex::Kernelize() {
-  ComputeKernelTextLen();
-  if (verbose) {
-    cerr << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
-    cerr << "Original length n    : " << text_len << endl;
-    cerr << "Kernel text length n : " << kernel_text_len << endl;
-    cerr << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
-  }
-
-  uint64_t *tmp_limits_kernel;
-  uchar *kernel_text;
-
-  MyBuffer * my_buffer;
-  if (lz_method == LZMethod::IN_MEMORY) {
-    my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
-  } else {
-    if (Utils::IsBioKernel(kernel_type)) {
-      my_buffer = new MyBufferFastaFile(text_filename);
+void HybridLZIndex::InitKernelizeonly(){
+    if (kernel_type == KernelType::BWA || kernel_type == KernelType::BOWTIE2|| kernel_type == KernelType::BLAST) {
+        special_separator = (uchar)'N';
     } else {
-      my_buffer = new MyBufferPlainFile(text_filename);
+        if (lz_method == LZMethod::IN_MEMORY) {
+            ChooseSpecialSeparator(tmp_seq);
+        } else {
+            ChooseSpecialSeparator(text_filename);
+        }
     }
-  }
-  MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
-  delete(my_buffer);
-
-	// kenrel_text is deleted by KernelManager
-  if (kernel_type == KernelType::FMI) {
-    kernel_manager = new KernelManagerFMI(kernel_text,
-                                          kernel_text_len,
-                                          kernel_manager_prefix,
-                                          verbose);
-  } else if (kernel_type == KernelType::BWA) {
-    kernel_manager = new KernelManagerBWA(kernel_text,
-                                          kernel_text_len,
-                                          kernel_manager_prefix,
-                                          verbose);
-  } else if (kernel_type == KernelType::BOWTIE2) {
-    kernel_manager = new KernelManagerBowTie2(kernel_text,
-                                              kernel_text_len,
-                                              kernel_manager_prefix,
-                                              n_threads,
-                                              max_memory_MB,
-                                              verbose);
-  } else if (kernel_type == KernelType::BLAST) {
-      kernel_manager = new KernelManagerBLAST(kernel_text,
-                                              kernel_text_len,
-                                              kernel_manager_prefix,
-                                              n_threads,
-                                              max_memory_MB,
-                                              verbose);
-  } else {
-    cerr << "Unknown kernel type given" << endl;
-    exit(EXIT_FAILURE);
-  }
-
-  EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
-  delete [] tmp_limits_kernel;
-
-  index_size_in_bytes += kernel_manager->GetSizeBytes();
-  // ASSERT(kernel_text_len == kernel_manager->GetLength());
+    vector<pair<uint64_t, uint64_t> > lz_phrases;
+    LempelZivParser::GetLZPhrases(&lz_phrases, this);
+    n_phrases = lz_phrases.size();
+    tsrr =  new RangeReporting(&lz_phrases, context_len, verbose);
+    tsrr->SetFileNames(index_prefix);
+    if (verbose >= 2)
+        cout << "Previous merge: " << n_phrases << " phrases." << endl;
+    n_phrases = lz_phrases.size();
+    if (verbose >= 2)
+        cout << "After merge: " << n_phrases << " phrases." << endl;
+    index_size_in_bytes += tsrr->GetSizeBytes();
+    Kernelizeonly();
+    ComputeSize();
+    if (verbose >= 2) {
+        DetailedSpaceUssage();
+    }
 }
+
+  void HybridLZIndex::Kernelizeonly() {
+        ComputeKernelTextLen();
+        if (verbose) {
+            cout << "+++++++++++++++++Kernelizeonly++++++++++++++++++++++++++++" << endl;
+            cout << "Original length n    : " << text_len << endl;
+            cout << "Kernel text length n : " << kernel_text_len << endl;
+            cout << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+        }
+
+        uint64_t *tmp_limits_kernel;
+        uchar *kernel_text;
+
+        long t1 = Utils::wclock();
+        MyBuffer * my_buffer;
+
+        if (lz_method == LZMethod::IN_MEMORY) {
+          my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
+        } else {
+          if (Utils::IsBioKernel(kernel_type)) {
+              my_buffer = new MyBufferFastaFile(text_filename);
+          } else {
+              my_buffer = new MyBufferPlainFile(text_filename);
+          }
+        }
+        MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
+        long t2 = Utils::wclock();
+        cout << "MakeKernelString from HDFS: "<< (t2-t1) << " seconds. " << endl;
+
+        delete(my_buffer);
+
+        long k1 = Utils::wclock();
+        if (kernel_type == KernelType::FMI) {
+            this->WriteKernelTextFile(kernel_text, kernel_text_len);
+        } else if (kernel_type == KernelType::BWA) {
+            this->WriteKernelTextFile(kernel_text, kernel_text_len);
+        } else if (kernel_type == KernelType::BOWTIE2) {
+            this->WriteKernelTextFile(kernel_text, kernel_text_len);
+        } else if (kernel_type == KernelType::BLAST) {
+            this->WriteKernelTextFile(kernel_text, kernel_text_len);
+        } else {
+            cerr << "Unknown kernel type given" << endl;
+            exit(EXIT_FAILURE);
+        }
+        long k2 = Utils::wclock();
+        cout << "Indexing: "<< (t2-t1) << " seconds. " << endl;
+
+        //delete [] kernel_text;
+
+        EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
+        store_to_file(limits_kernel, limits_kernel_filename);
+        store_to_file(sparse_sample_limits_kernel, sparse_sample_limits_kernel_filename);
+
+        delete [] tmp_limits_kernel;
+
+        //index_size_in_bytes += kernel_manager->GetSizeBytes();
+        // ASSERT(kernel_text_len == kernel_manager->GetLength());
+    }
+
+    void HybridLZIndex::WriteKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len) {
+        FILE * fp = Utils::OpenWriteOrDie(kernel_manager_prefix);
+        if (_kernel_text_len != fwrite(_kernel_text, 1, _kernel_text_len, fp)) {
+            cout << "Error writing the kernel to a file" << endl;
+            exit(1);
+        }
+        fclose(fp);
+    }
 
 void HybridLZIndex::IndexKernel() {
     ComputeKernelTextLen();
@@ -277,6 +317,69 @@ void HybridLZIndex::IndexKernel() {
     // ASSERT(kernel_text_len == kernel_manager->GetLength());
 }
 
+void HybridLZIndex::Kernelize() {
+        ComputeKernelTextLen();
+        if (verbose) {
+            cerr << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+            cerr << "Original length n    : " << text_len << endl;
+            cerr << "Kernel text length n : " << kernel_text_len << endl;
+            cerr << "+++++++++++++++++++++++++++++++++++++++++++++" << endl;
+        }
+
+        uint64_t *tmp_limits_kernel;
+        uchar *kernel_text;
+
+        MyBuffer * my_buffer;
+        if (lz_method == LZMethod::IN_MEMORY) {
+            my_buffer = new MyBufferMemSeq(tmp_seq, text_len);
+        } else {
+            if (Utils::IsBioKernel(kernel_type)) {
+                my_buffer = new MyBufferFastaFile(text_filename);
+            } else {
+                my_buffer = new MyBufferPlainFile(text_filename);
+            }
+        }
+
+        MakeKernelString(my_buffer, &kernel_text, &tmp_limits_kernel);
+        delete(my_buffer);
+
+        // kenrel_text is deleted by KernelManager
+        if (kernel_type == KernelType::FMI) {
+            kernel_manager = new KernelManagerFMI(kernel_text,
+                                                  kernel_text_len,
+                                                  kernel_manager_prefix,
+                                                  verbose);
+        } else if (kernel_type == KernelType::BWA) {
+            kernel_manager = new KernelManagerBWA(kernel_text,
+                                                  kernel_text_len,
+                                                  kernel_manager_prefix,
+                                                  verbose);
+        } else if (kernel_type == KernelType::BOWTIE2) {
+            kernel_manager = new KernelManagerBowTie2(kernel_text,
+                                                      kernel_text_len,
+                                                      kernel_manager_prefix,
+                                                      n_threads,
+                                                      max_memory_MB,
+                                                      verbose);
+        } else if (kernel_type == KernelType::BLAST) {
+            kernel_manager = new KernelManagerBLAST(kernel_text,
+                                                    kernel_text_len,
+                                                    kernel_manager_prefix,
+                                                    n_threads,
+                                                    max_memory_MB,
+                                                    verbose);
+        } else {
+            cerr << "Unknown kernel type given" << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        EncodeKernelLimitsAndSuccessor(tmp_limits_kernel);
+        delete [] tmp_limits_kernel;
+
+        index_size_in_bytes += kernel_manager->GetSizeBytes();
+        // ASSERT(kernel_text_len == kernel_manager->GetLength());
+    }
+
 // Assumes that the resulting kernel string fits in main memory.
 // That is OK, as we will need to index it, so this is a hard limit for now.
 void HybridLZIndex::MakeKernelString(MyBuffer * is,
@@ -298,7 +401,7 @@ void HybridLZIndex::MakeKernelString(MyBuffer * is,
       if (right-left < 2*context_len+2 || tsrr->IsLiteral(i)) {
         is->SetPos(left);
         for (size_t j =left; j < right; j++, posFil++) {
-          kernel_text[posFil] = is->GetChar();;
+          kernel_text[posFil] = is->GetChar();
         }
       } else {
         // copy M symbol + '$' + M symbols...
@@ -808,11 +911,10 @@ void HybridLZIndex::FindFQ(char * query_filename,
             if(kernel_type!=KernelType::BLAST) primary_buffer[kk].Init();
             else primary_buffer[kk].InitBlast();
         }
-        ASSERT(secondary_per_thread->at(t).size() == 0);
+        //ASSERT(secondary_per_thread->at(t).size() == 0);
         KernelOccsToPrimaryOccsFQ(&(primary_buffer[thread_starting_pos]),
                                   thread_length,
                                   secondary_report);
-
 
         if (secondary_report == SecondaryReportType::ALL ||
             secondary_report == SecondaryReportType::LZ) {

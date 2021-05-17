@@ -103,6 +103,8 @@ class HybridLZIndex {
     return rlz_ref_len_MB; 
   }
   void ValidateParams(BuildParameters * params);
+  void WriteKernelTextFile(uchar * _kernel_text, size_t _kernel_text_len);
+
   /////////////////////
   // INDEX QUERIES
 /////////////////////
@@ -125,6 +127,9 @@ class HybridLZIndex {
   void SetFileNames();
   void GetLZPhrases(vector<pair<uint64_t, uint>> * lz_phrases_ptr);
   void Kernelize();
+  void InitKernelizeonly();
+  void Kernelizeonly();
+  void IndexingOnly();
   void IndexKernel();
   void Indexing();
   void MakeKernelString(MyBuffer *is, uchar ** kernel_ans, uint64_t ** tmp_limits_kernel_ans);

@@ -57,25 +57,30 @@ class Occurrence {
     
     string flag_token = message.substr(first_occ + 1, second_occ - first_occ - 1);
     flag = stoi(flag_token);
-    //cout << "Flag: " << flag << endl; 
 
     string pos_token = message.substr(third_occ + 1, fourth_occ - third_occ - 1);
-    //cout << "string pos:'" << pos_token << "'" << endl;
+    //cout << "string pos:'" << pos_token << "'";
+    //fprintf(stderr, "Pos %s", pos_token);
     uint64_t one_based_pos = stoul(pos_token);
-    //cout << "uint pos:'" << one_based_pos << "'" << endl;
+    //cout << "uint pos:'" << one_based_pos << "'";
     ASSERT(one_based_pos>0 || flag == 4);
     pos = one_based_pos - 1;
     
     string cigar_token = message.substr(fifth_occ + 1, sixth_occ - fifth_occ - 1);
-    //cout << "CIGAR: " << cigar_token << endl;
+    //cout << "CIGAR: " << cigar_token;
+    //fprintf(stderr, "CIGAR %s", cigar_token);
+
     this->length = CigarToLen(cigar_token);
     size_t soft_clipped = CigarSoftClipped(cigar_token);
+      //fprintf(stderr, "pos_token %s", pos_token.c_str());
 
-    string seq_token = message.substr(ninth_occ + 1, tenth_occ - ninth_occ - 1);
-    //cout << "string seq:'" << seq_token << "'" << endl;
-    //cout << "strlen(seq)'" << seq_token.size() << "'" << endl;
+
+      string seq_token = message.substr(ninth_occ + 1, tenth_occ - ninth_occ - 1);
+    //cout << "string seq:'" << seq_token << "'";
+    //cout << "strlen(seq)'" << seq_token.size() << "'";
     
-    ASSERT(flag == 4 || seq_token.size()==1||seq_token.size()== length + soft_clipped );
+    //ASSERT(flag == 4 || seq_token.size()==1||seq_token.size()== length + soft_clipped );
+      //fprintf(stderr, "seq token %s", seq_token.c_str());
   }
     void InitBlast() {
         size_t first_occ = message.find("\t");
@@ -144,8 +149,7 @@ class Occurrence {
       uint second_occ = message.find("\t", first_occ + 1);
       uint third_occ = message.find("\t", second_occ + 1);
       uint fourth_occ = message.find("\t", third_occ + 1);
-      //string pos_token = message.substr(third_occ + 1, fourth_occ - third_occ - 1);
-
+      string pos_token = message.substr(third_occ + 1, fourth_occ - third_occ - 1);
       message.replace(third_occ + 1, fourth_occ - third_occ - 1, std::to_string(new_pos+1));
 
       if (new_chr_name.length() != 0) {

@@ -35,7 +35,7 @@ KernelManagerBLAST::KernelManagerBLAST(uchar * input_kernel_text,
 #else
   //string bt2_command_index = string(PROJECT_ROOT);
 
-  string bt2_command_index = "/opt/blast/bin/";
+  string bt2_command_index = "";
   bt2_command_index += "makeblastdb -in ";
   bt2_command_index += " " + kernel_text_filename;
   //bt2_command_index += " -blastdb_version 5 ";
@@ -76,7 +76,7 @@ KernelManagerBLAST::KernelManagerBLAST(char * _kernel_text_filename,
     exit(-1);
 #else
     //string bt2_command_index = string(PROJECT_ROOT);
-  string bt2_command_index = "/opt/blast/bin/";
+  string bt2_command_index = "";
   bt2_command_index += "makeblastdb -in ";
   bt2_command_index += " " + kernel_text_filename;
   //bt2_command_index += " -blastdb_version 5 ";
@@ -155,7 +155,7 @@ string  KernelManagerBLAST::LocateOccsFQ(char * query_filename,
   //all_flags += " --very-sensitive"; 
 
   //bt2_command_align.assign(PROJECT_ROOT);
-  bt2_command_align = "/opt/blast/bin/blastn " + all_flags;
+  bt2_command_align = "blastn " + all_flags;
   bt2_command_align += " -db " + kernel_text_filename;  // we have used kernel_text_filename as basename for the index, should be ok.
 
     bt2_command_align += " -query "+ string(query_filename);

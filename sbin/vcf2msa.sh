@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 #Download latest from https://github.com/tsnorri/vcf2multialign
 
@@ -6,19 +6,28 @@ PGPATHHDFS=$1
 PGPATHLOCAL=$2
 STDREFPATH=$3
 VCFPATH=$4
+CHR=$5
 
 mkdir -p $PGPATHLOCAL
 
 DIR=$( pwd )
-task(){ 
-      i=$(printf "%02d" $1)
+
+      i=$(printf "%02d" $CHR)
        mkdir -p $PGPATHLOCAL/$i
        cd $PGPATHLOCAL/$i
-       $DIR/sbin/vcf2multialign -S --chunk-size=200 -r $STDREFPATH/chr${1}.fa -a $VCFPATH/chr${1}.vcf
-      mmv "./*" "../#1.${i}"
+       $DIR/vcf2multialign -S --chunk-size=200 -r $STDREFPATH/chr${CHR}.fa -a $VCFPATH/chr${CHR}.vcf
 
-      hdfs dfs -put $PGPATHLOCAL/*.$i $PGPATHHDFS
+      # Add Fasta header
+      ls | xargs -I{} -n 1 -P16 sed -i 1i">"{}".${i}" {}
+
+      mmv "./*" "../#1.${i}"
+      # Concate by chromosomes if needed
+      #cat "./*" >> "../chr.${i}"
+
+      hdfs dfs -put $PGPATHLOCAL/*.$i $PGPATHHDFS/
       #rm -rf $PGPATHLOCAL/$i/
-}
-for num in {1..22}; do task "$num"& done
+
+
+
+
 

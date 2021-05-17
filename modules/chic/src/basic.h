@@ -56,6 +56,7 @@ typedef struct {
 	uint max_edit_distance;
 	KernelType kernel_type;
     int indexingonly;
+    int kernelizeonly;
 	int verbose;
 } BuildParameters;
 

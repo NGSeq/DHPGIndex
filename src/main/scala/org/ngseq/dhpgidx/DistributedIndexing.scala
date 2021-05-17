@@ -1,17 +1,13 @@
 package org.ngseq.dhpgidx
 
-import java.io._
 import java.net.URI
-import java.util.UUID
 
+import org.apache.commons.cli.{BasicParser, CommandLine, Option, Options, ParseException}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.hdfs.DFSClient
-import org.apache.hadoop.io.{LongWritable, Text}
-import org.apache.hadoop.mapreduce.lib.input.TextInputFormat
 import org.apache.spark.sql.SparkSession
+
 import scala.sys.process._
-import org.apache.commons.cli.{BasicParser, CommandLine, Option, Options, ParseException}
 
 
 object DistributedIndexing{
@@ -70,11 +66,10 @@ object DistributedIndexing{
         (o: String) => out.append(o),
         (e: String) => err.append(e))
 
-      val chicindex = Process("/opt/dhpgindex/chic_index --threads="+threads+"  --kernel=BLAST --verbose=2 --lz-parsing-method=RELZ --lz-input-plain-file="+localpath+"/"+bname+".lz -o "+localpath+"/"+fname+" "+localpath+"/"+fname+" "+maxqlen).!
+      val chicindex = Process("/opt/dhpgindex/chic_index --threads="+threads+"  --kernel=BLAST --verbose=2 --lz-parsing-method=RLZ --lz-input-plain-file="+localpath+"/"+bname+".lz -o "+localpath+"/"+fname+" "+localpath+"/"+fname+" "+maxqlen).!
       //val status = chicproc.!(logger)
 
       //if(status!=0) System.out.println(err.toString())
-
       if(cmd.hasOption("qfile")){
         val hdfsqfile = new Path(cmd.getOptionValue("qfile"))
         val qname=hdfsqfile.getName()

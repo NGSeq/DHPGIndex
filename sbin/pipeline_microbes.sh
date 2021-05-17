@@ -7,23 +7,28 @@ set -e
 
 export SPARK_MAJOR_VERSION=2
 
-LOCALINDEXPATH=/mnt/tmp
-HDFSURI=hdfs://node-1:8020 # HDFS URI
-NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starting from 1.
-MAX_QUERY_LEN=1000 # Set maximum sequence length for index queries (should be > max read length or > BLAST alignment length)
-HDFSUSERDIR=$HDFSURI/user/root
-PGPATHLOCAL=$1 #directory containing pan-genome files in FASTA format
-PGPATHHDFS=$HDFSUSERDIR/pg
-DRLZPATHHDFS=$HDFSUSERDIR/drlz
-SPARKMASTER=yarn-client #For single node testing use local[n] where n is the amount of executors,
-N=26 #number of cluster nodes
-
+PGPATHLOCAL=$1 #Local directory containing pan-genome files in FASTA format
+#Use with BLAST
+QSEQS=$2 #Local path to single FASTA file (query file)
 #Use paired-end reads with Bowtie etc. read aligners.
 #READS_1=$2
 #READS_2=$3
 
-#Use with BLAST
-QSEQS=$2 #path to single file in local fs
+N=1 #Number of cluster nodes, N=1 is just for testing, HDFS requires at least 3 datanodes for replication as default
+LOCALINDEXPATH=/mnt/tmp #Intermediate files and the final index are stored here
+HDFSURI=hdfs://node-1:8020 # HDFS URI
+NODE=node- #Basename for nodes in the cluster. The nodes must be numbered starting from 1.
+MAX_QUERY_LEN=1000 # Set maximum sequence length for index queries (should be > max read length or > BLAST alignment length)
+DICTSIZE=0.33 #Fraction of dictionary in decimals (maximum is 1.0)
+HDFSUSERDIR=$HDFSURI/user/root
+PGPATHHDFS=$HDFSUSERDIR/pg #HDFS path to store pan-genome
+DRLZPATHHDFS=$HDFSUSERDIR/drlz #HDFS path to store compressed data
+
+SPARKMASTER=local[4] #Recommended: "yarn-client" or "yarn-cluster". For single node testing use local[n] where n is the amount of executors.
+EXECUTORMEM=6g  #Spark executor memory. If YARN used, cannot exceed yarn.nodemanager.resource.memory-mb defined in /opt/hadoop/etc/hadoop/yarn-site.xml
+DRIVERMEM=6g  #Spark driver memory
+THREADS=2 # Number of threads used with chic indexing and alignment (passed to Bowtie and BLAST parameters). Should not exceed the total number of cores of the node.
+
 hdfs dfs -mkdir -p $HDFSUSERDIR/qseqs
 hdfs dfs -put $QSEQS $HDFSUSERDIR/qseqs/
 
@@ -38,18 +43,17 @@ hdfs dfs -put $PGPATHLOCAL/* $PGPATHHDFS
 date >> runtime.log
 echo "Starting DRLZ.." 
 start=`date +%s`
-#seq 1 $N | xargs -I{} -n 1 -P $N ./drlz_microbes.sh {} pg lz groupedfasta 0.33 &
-./drlz_microbes.sh $PGPATHHDFS $DRLZPATHHDFS $HDFSUSERDIR/groupedfasta 0.33 $HDFSURI $SPARKMASTER
+./drlz_microbes.sh $PGPATHHDFS $DRLZPATHHDFS $HDFSUSERDIR/groupedfasta $DICTSIZE $HDFSURI $SPARKMASTER $DRIVERMEM $EXECUTORMEM
 runtime=$((end-start))
 echo "DRLZ compression time: ${runtime}" >> runtime.log
 
 date >> runtime.log
-echo "Starting distributed indexing.."
+echo "Starting distributed indexing and alignment.."
 start=`date +%s`
 
 hdfs dfs -mkdir $HDFSUSERDIR/blasted
 QFNAME=$(basename -- "$QSEQS")
-./distributed_indexing.sh $HDFSUSERDIR/groupedfasta $DRLZPATHHDFS $LOCALINDEXPATH $MAX_QUERY_LEN $HDFSURI $SPARKMASTER $HDFSUSERDIR/qseqs/$QFNAME
+./distributed_indexing.sh $HDFSUSERDIR/groupedfasta $DRLZPATHHDFS $LOCALINDEXPATH $MAX_QUERY_LEN $HDFSURI $SPARKMASTER $HDFSUSERDIR/qseqs/$QFNAME $THREADS
 
 #Using single merged index (useful with Bowtie. "makeblastdb" is limited to 4GB input)
 
@@ -68,7 +72,7 @@ echo "Indexed and aligned in: ${runtime}" >> runtime.log
 date >> runtime.log
 
 hdfs dfs -get $HDFSUSERDIR/blasted
-echo "Alignments downloaded from HDFS"
+echo "Alignments downloaded from HDFS to folder blasted"
 
 
 #echo "Aligning sequences.."
