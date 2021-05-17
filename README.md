@@ -4,7 +4,7 @@ DHPGIndex
 General
 -------
 
-This tool is for compressing and indexing pan-genomes and genome sequence collections for scalable sequence and read alignment purposes. The pipeline can be deployed in cloud computing environment or in dedicated computing cluster. The tool extends the CHIC aligner https://gitlab.com/dvalenzu/CHIC with distributed and scalable features.
+This tool is for compressing and indexing pan-genomes and genome sequence collections for scalable sequence and read alignment purposes. The pipeline can be deployed in cloud computing environment or in dedicated computing cluster. The tool extends the CHIC aligner https://gitlab.com/dvalenzu/CHIC with distributed and scalable features. DHPGIndex have been tested with bacterial and human genomes, but could be harnessed for other species with little modifications.
 
 
 Requirements
