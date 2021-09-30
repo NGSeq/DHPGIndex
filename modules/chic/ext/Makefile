@@ -31,5 +31,5 @@ sdsl-lite-2.1.1.zip.offline.install.zip:
 # LZscan does not need to be compiled
 
 $(ReLZ_DIR)/ReLZ:
-	./get_relz.shs
+	./get_relz.sh
 
